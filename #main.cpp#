@@ -1,0 +1,23 @@
+#include <Arduino.h>
+
+int main() {
+    init();
+    Serial.begin(9600);
+
+
+    pinMode(13, OUTPUT);
+    int numberTimes = 100;
+
+    for (int i = 0; i < numberTimes; i++) {
+
+        digitalWrite(13,HIGH);
+        Serial.print(i);
+
+        delay(1000);
+        digitalWrite(13, LOW);
+    }
+
+    Serial.println("end");
+
+    return 0;
+
