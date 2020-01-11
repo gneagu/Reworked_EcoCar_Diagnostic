@@ -3,6 +3,8 @@ import time
 import ast
 import cProfile
 import sys
+from PyQt4 import QtGui, QtCore
+import mainUI
 
 debug = 0
 
@@ -21,6 +23,8 @@ def determinePorts():
 
     print("No ports available. Ending program.\n")
     sys.exit()
+
+
 
 def main():
     ard = determinePorts()
@@ -43,10 +47,32 @@ def main():
     print(ast.literal_eval(msg.decode()))
 
 
+class TestWindow(QtGui.QMainWindow):
+    def __init__(self):
+        super(TestWindow, self).__init__()
+        self.ui = mainUI.Ui_Dialog()
+        self.ui.setupUi(self)
+
 if __name__ == "__main__":
-    print("HERe")
-    if debug == 0:
-        print("HER")
-        main()
+    app = QtGui.QApplication(sys.argv)
+    # thread = AThread()
+    # thread.finished.connect(app.exit)
+    window = TestWindow()
+    window.show()
+    sys.exit(app.exec_())
+
+
+# if __name__ == "__main__":
+#     app = QtGui.QApplication(sys.argv)
+#     Dialog = QtGui.QDialog()
+#     ui = Ui_Dialog()
+#     ui.setupUi(Dialog)
+#     Dialog.show()
+#
+# if __name__ == "__main__":
+#     print("HERe")
+#     if debug == 0:
+#         print("HER")
+#         main()
 #     elif debug == 1:
 #         cProfile.run('main()')
