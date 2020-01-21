@@ -4,65 +4,29 @@ import ast
 import cProfile
 import sys
 from PyQt4 import QtGui, QtCore
-import mainUI
+import mainUI2
 
 debug = 0
-
-# def determinePorts():
-#     #List of possible ports.
-#     ports = ['/dev/ttyACM0', '/dev/ttyACM1', '/dev/ttyACM2', '/dev/ttyACM3']
-#
-#     #See if possible to open connection on port (should mean that's the comms hub)
-#     for port in ports:
-#         try:
-#             portConnection = serial.Serial(port, 9600, timeout=1)
-#             print("Connect to port: {}".format(port))
-#             return(portConnection)
-#         except:
-#             pass
-#
-#     print("No ports available. Ending program.\n")
-#     sys.exit()
-
-# class mythread(QtCore.QThread):
-#     total = QtCore.pyqtSignal(object)
-#     update = QtCore.pyqtSignal()
-#
-#     def __init__(self, parent, n):
-#         super(mythread, self).__init__(parent)
-#         self.n = n
-#
-#     #Put code in here
-#     def run(self):
-#         self.total.emit(self.n)
-#         i = 0
-#
-#         while(i<self.n):
-#             if (time.time() % 1 == 0):
-#                 i += 1
-#                 print(str(i))
-#                 self.update.emit()
-
 
 def main():
     ard = determinePorts()
     ard.flush()
 
-    print("Sending value: T")
-    ard.write(b"T")
-
-    time.sleep(1)
-
-    msg = ard.readline();
-
-    if (debug == 1) :
-        print("Message reeceived: ")
-        print(msg)
-
-
-    ard.close()
-
-    print(ast.literal_eval(msg.decode()))
+    # print("Sending value: T")
+    # ard.write(b"T")
+    #
+    # time.sleep(1)
+    #
+    # msg = ard.readline();
+    #
+    # if (debug == 1) :
+    #     print("Message reeceived: ")
+    #     print(msg)
+    #
+    #
+    # ard.close()
+    #
+    # print(ast.literal_eval(msg.decode()))
 
 
 class TestWindow(QtGui.QMainWindow):
@@ -70,7 +34,9 @@ class TestWindow(QtGui.QMainWindow):
 
     def __init__(self):
         super(TestWindow, self).__init__()
-        self.ui = mainUI.Ui_Dialog()
+        self.numOfVars = 7
+        self.buttons = []
+        self.ui = mainUI2.Ui_Dialog()
         self.ui.setupUi(self)
 
         self.ui.set_pushButton_2.clicked.connect(self.appinit)
@@ -92,22 +58,71 @@ class TestWindow(QtGui.QMainWindow):
         portConnection = serial.Serial(COM_port, baud_rate, timeout=1)
         return(portConnection)
 
+    def get_all_variables(self, connection):
+        #get number of variables from comms hub
+        pass
+
     #Initializes seperate thread.
     def appinit2(self):
-        port = self.port_connect()
-        thread = arduino_worker(port)
-        self.connect(thread, thread.signal, self.testfunc)
-        thread.start()
+        self.ui.tableWidget.insertColumn(0)
+        self.ui.tableWidget.insertColumn(1)
+        self.ui.tableWidget.insertColumn(2)
 
-    # Find active COM ports.
+        #Get number of variables
+
+        for i in range(self.numOfVars):
+            #Get value of variable
+            name = "X"
+
+            self.ui.tableWidget.insertRow(i)
+
+            #Create text name
+            self.ui.tableWidget.setItem(i, 0,QtGui.QTableWidgetItem(name))
+
+            #Create Button to push to tableWidget
+            self.buttons.append(QtGui.QPushButton(self.ui.tableWidget))
+            self.buttons[i].setText("Graph".format(i))
+
+            #Set cell as text, and button
+            self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
+
+
+
+        # for i in range(self.numOfVars):
+        #     self.ui.tableWidget.insertColumn(i)
+        #     self.ui.tableWidget.setItem(0, i,QtGui.QTableWidgetItem("hello"))
+        #     # self.ui.tableWidget.setCellWidget(0,i, btn)
+        #
+        #w
+        #     #Create Button to push to tableWidget
+        #     self.buttons.append(QtGui.QPushButton(self.ui.tableWidget))
+        #     # "btn{}".append(i) = QtGui.QPushButton(self.ui.tableWidget)
+        #     self.buttons[i].setText("PUSH")
+        #
+        #     #Set cell as text, and button
+        #     self.ui.tableWidget.setItem(2, i,QtGui.QTableWidgetItem("hello"))
+        #     self.ui.tableWidget.setCellWidget(2, i, self.buttons[i])
+
+        # pass
+
+        # self.ui.tableView.append([1,1,1,1,1])
+        # sele.tableView.model().laoyoutChanged.emit()
+        # print("Success")
+        # rowPosition = self.ui.tableView.rowCount()
+        # table.insertRow(rowPosition)
+        #
+        # self.ui.tableView.setItem(rowPorition, 0, QtGui.QTableWidgetItem("text1"))
+        # port = self.port_connect()
+        # thread = arduino_worker(port)
+        # self.connect(thread, thread.signal, self.testfunc)
+        # thread.start()
+
+    # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
         list_of_ports = []
-
         ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
 
-        # print(ports)
-
-        #See if possible to open connection on port (should mean that's the comms hub)
+        #See if possible to open connection on port (should only open if theres an active device)
         for port in ports:
             try:
                 portConnection = serial.Serial(port)
@@ -115,8 +130,11 @@ class TestWindow(QtGui.QMainWindow):
                 list_of_ports.append(port)
             except:
                 pass
+
+        #Check if any ports are available.
         if len(list_of_ports) == 0:
             self.ui.com_port_comboBox.addItem("No Ports Found")
+            self.ui.set_pushButton_2.setEnabled(False);
         else:
             for port in list_of_ports:
                 self.ui.com_port_comboBox.addItem(port)
@@ -124,12 +142,16 @@ class TestWindow(QtGui.QMainWindow):
     def testfunc(self, sigstr):
         return(sigstr)
 
+    def update_data_view(self, data):
+        pass
+
 #This is the thread that works independently on the main.
 class worker(QtCore.QThread):
     def __init__(self, list_of_variables):
         QtCore.QThread.__init__(self, parent = app)
         self.signal = QtCore.SIGNAL("signal")
 
+    #Self.emit will emit data back to main thread.
     def run(self):
         time.sleep(5)
         for i in range(5):
@@ -147,26 +169,28 @@ class arduino_worker(QtCore.QThread):
         QtCore.QThread.__init__(self, parent = app)
         self.signal = QtCore.SIGNAL("signal")
         self.connection = connection
-        # self.list_of_variables = list_of_variables
-        self.connection = connection
-
 
     def run(self):
         self._get_data_from_arduino(self.connection)
         self.emit(self.signal, "i from thread")
 
+    def __del__(self):
+        self.wait()
+
     def _get_data_from_arduino(self, connection):
         self.connection.flush()
 
-        print("Sending value: T")
-        self.connection.write(b"T")
+        while (1 == 1):
 
-        # time.sleep(1)
-        self.sleep(1)
+            print("Sending value: T")
+            self.connection.write(b'T')
 
-        msg = self.connection.readline();
-        print(msg)
+            # self.usleep(2000)
 
+            msg = self.connection.readline();
+
+            print(msg)
+            print("Finish")
 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
@@ -175,40 +199,7 @@ if __name__ == "__main__":
     # QtCore.QTimer.singleShot(0, window.appinit)
     sys.exit(app.exec_())
 
-# import glob
-#
-# # ports = ['COM%s' % (i + 1) for i in range(256)]
-# ports = glob.glob('/dev/tty[A-Za-z]*')
-#
-# for i in ports:
-#     print(i)
 
-# import serial
-# import time
-# import ast
-# import cProfile
-# import sys
-# from PyQt4 import QtGui, QtCore
-# import mainUI
-#
-# debug = 0
-#
-# def determinePorts():
-#     #List of possible ports.
-#     ports = ['/dev/ttyACM0', '/dev/ttyACM1', '/dev/ttyACM2', '/dev/ttyACM3']
-#
-#     #See if possible to open connection on port (should mean that's the comms hub)
-#     for port in ports:
-#         try:
-#             portConnection = serial.Serial(port, 9600, timeout=1)
-#             print("Connect to port: {}".format(port))
-#             return(portConnection)
-#         except:
-#             pass
-#
-#     print("No ports available. Ending program.\n")
-#     sys.exit()
-#
 #
 #
 # def main():
@@ -231,70 +222,4 @@ if __name__ == "__main__":
 #
 #     print(ast.literal_eval(msg.decode()))
 #
-#
-# class TestWindow(QtGui.QMainWindow):
-#
-#     signalStatus = QtCore.pyqtSignal(str)
-#
-#     def __init__(self):
-#         super(TestWindow, self).__init__()
-#         self.ui = mainUI.Ui_Dialog()
-#         self.ui.setupUi(self)
-#         self.createWorkerThread()
-#         self._connectSignals()
-#
-#     def _connectSignals(self):
-#         self.ui.set_pushButton_2.clicked.connect(self.gui.updateStatus)
-#
-#     def createWorkerThread(self):
-#         self.worker = WorkerObject()
-#         self.worker_thread = QtCore.QThread()
-#         self.worker.moveToThread(self.worker_thread)
-#         self.worker_thread.start()
-#
-#         self.worker.signalStatus.connect(self.gui.updateStatus)
-#         self.ui.debug_pushButton_5.connect(self.worker.startWork)
-#
-#     @QtCore.pyqtSlot(str)
-#     def updateStatus(self, status):
-#         self.label_2.setText(status)
-#
-# if __name__ == "__main__":
-#     app = QtGui.QApplication(sys.argv)
-#     # thread = AThread()
-#     # thread.finished.connect(app.exit)
-#     window = TestWindow()
-#     window.show()
-#     # thread.start()
-#     sys.exit(app.exec_())
-#
-
-# if __name__ == "__main__":
-#     app = QtGui.QApplication(sys.argv)
-#     Dialog = QtGui.QDialog()
-#     ui = Ui_Dialog()
-#     ui.setupUi(Dialog)
-#     Dialog.show()
-#
-# if __name__ == "__main__":
-#     print("HERe")
-#     if debug == 0:
-#         print("HER")
-#         main()
-#     elif debug == 1:
-#         cProfile.run('main()')
-
-# if __name__ == "__main__":
-#     app = QtGui.QApplication(sys.argv)
-#     Dialog = QtGui.QDialog()
-#     ui = Ui_Dialog()
-#     ui.setupUi(Dialog)
-#     Dialog.show()
-#
-# if __name__ == "__main__":
-#     print("HERe")
-#     if debug == 0:
-#         print("HER")
-#         main()
-#     elif debug == 1:
-#         cProfile.run('main()')
+#s
