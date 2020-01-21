@@ -5,32 +5,11 @@ import cProfile
 import sys
 from PyQt4 import QtGui, QtCore
 import mainUI2
+import sys
 
 debug = 0
 
-def main():
-    ard = determinePorts()
-    ard.flush()
-
-    # print("Sending value: T")
-    # ard.write(b"T")
-    #
-    # time.sleep(1)
-    #
-    # msg = ard.readline();
-    #
-    # if (debug == 1) :
-    #     print("Message reeceived: ")
-    #     print(msg)
-    #
-    #
-    # ard.close()
-    #
-    # print(ast.literal_eval(msg.decode()))
-
-
 class TestWindow(QtGui.QMainWindow):
-
 
     def __init__(self):
         super(TestWindow, self).__init__()
@@ -44,23 +23,33 @@ class TestWindow(QtGui.QMainWindow):
 
         self.set_port_comboBox_selections()
 
-
     #Initializes seperate thread.
     def appinit(self):
-        thread = worker()
+        connection = self.port_connect()
+        thread = worker(connection)
         self.connect(thread, thread.signal, self.testfunc)
+
+        #Here should get x variables.
+        self.set_data_view_variables(connection)
+
         thread.start()
 
+    #Taking user selection, opens a conenction on specified port.
     def port_connect(self):
-        #Get data from
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
         portConnection = serial.Serial(COM_port, baud_rate, timeout=1)
         return(portConnection)
 
-    def get_all_variables(self, connection):
-        #get number of variables from comms hub
-        pass
+    #Will set rows in tables name from here.
+    def set_data_view_variables(self, connection):
+        # connection.flush()
+        connection.write(b"GET *VCOUNT\n")
+        # x = connection.readline()
+        print("read")
+        # print(x)
+
+
 
     #Initializes seperate thread.
     def appinit2(self):
@@ -69,59 +58,34 @@ class TestWindow(QtGui.QMainWindow):
         self.ui.tableWidget.insertColumn(2)
 
         #Get number of variables
-
-        for i in range(self.numOfVars):
-            #Get value of variable
-            name = "X"
-
-            self.ui.tableWidget.insertRow(i)
-
-            #Create text name
-            self.ui.tableWidget.setItem(i, 0,QtGui.QTableWidgetItem(name))
-
-            #Create Button to push to tableWidget
-            self.buttons.append(QtGui.QPushButton(self.ui.tableWidget))
-            self.buttons[i].setText("Graph".format(i))
-
-            #Set cell as text, and button
-            self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
-
-
-
-        # for i in range(self.numOfVars):
-        #     self.ui.tableWidget.insertColumn(i)
-        #     self.ui.tableWidget.setItem(0, i,QtGui.QTableWidgetItem("hello"))
-        #     # self.ui.tableWidget.setCellWidget(0,i, btn)
         #
-        #w
+        # for i in range(self.numOfVars):
+        #     #Get value of variable
+        #     name = "X"
+        #
+        #     self.ui.tableWidget.insertRow(i)
+        #
+        #     #Create text name
+        #     self.ui.tableWidget.setItem(i, 0,QtGui.QTableWidgetItem(name))
+        #
         #     #Create Button to push to tableWidget
         #     self.buttons.append(QtGui.QPushButton(self.ui.tableWidget))
-        #     # "btn{}".append(i) = QtGui.QPushButton(self.ui.tableWidget)
-        #     self.buttons[i].setText("PUSH")
+        #     self.buttons[i].setText("Graph".format(i))
         #
         #     #Set cell as text, and button
-        #     self.ui.tableWidget.setItem(2, i,QtGui.QTableWidgetItem("hello"))
-        #     self.ui.tableWidget.setCellWidget(2, i, self.buttons[i])
+        #     self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
 
-        # pass
-
-        # self.ui.tableView.append([1,1,1,1,1])
-        # sele.tableView.model().laoyoutChanged.emit()
-        # print("Success")
-        # rowPosition = self.ui.tableView.rowCount()
-        # table.insertRow(rowPosition)
-        #
-        # self.ui.tableView.setItem(rowPorition, 0, QtGui.QTableWidgetItem("text1"))
-        # port = self.port_connect()
-        # thread = arduino_worker(port)
-        # self.connect(thread, thread.signal, self.testfunc)
-        # thread.start()
 
     # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
         list_of_ports = []
-        ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
 
+        if sys.platform.startswith('linux'):
+            ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
+        elif sys.platform.startswith('win'):
+            ports = ['COM{}'.format(i + 1) for i in range(256)]
+
+            
         #See if possible to open connection on port (should only open if theres an active device)
         for port in ports:
             try:
@@ -147,50 +111,31 @@ class TestWindow(QtGui.QMainWindow):
 
 #This is the thread that works independently on the main.
 class worker(QtCore.QThread):
-    def __init__(self, list_of_variables):
+    def __init__(self, connection):
         QtCore.QThread.__init__(self, parent = app)
         self.signal = QtCore.SIGNAL("signal")
+        # print(connection)
+        self.connection = connection
 
     #Self.emit will emit data back to main thread.
     def run(self):
+        print("Her")
+        print(self.connection)
+
+        #Here get the number of variable, and return to main thread.
+
         time.sleep(5)
         for i in range(5):
-            time.sleep(3)
+            time.sleep(0.1)
             # self.ui.com_port_comboBox.addItme(i)
             print("Loop 1")
         print("IN THREAD")
         self.emit(self.signal, "i from thread")
 
-    def _get_data_from_arduino(self, list_of_variables):
-        pass
-
-class arduino_worker(QtCore.QThread):
-    def __init__(self, connection):
-        QtCore.QThread.__init__(self, parent = app)
-        self.signal = QtCore.SIGNAL("signal")
-        self.connection = connection
-
-    def run(self):
-        self._get_data_from_arduino(self.connection)
-        self.emit(self.signal, "i from thread")
-
     def __del__(self):
         self.wait()
 
-    def _get_data_from_arduino(self, connection):
-        self.connection.flush()
 
-        while (1 == 1):
-
-            print("Sending value: T")
-            self.connection.write(b'T')
-
-            # self.usleep(2000)
-
-            msg = self.connection.readline();
-
-            print(msg)
-            print("Finish")
 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
