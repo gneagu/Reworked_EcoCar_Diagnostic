@@ -4,8 +4,10 @@
 ### Install Insctructions for PyQt5 (Painful any other way)
 ***
 
-> These instructions should help to install PyQt5. 
+> These instructions should help to install PyQt5.
+
 > The library is great, but really finicky to install.
+
 > Please follow the below instructions.
 
 1. python3 -m venv env
@@ -13,6 +15,7 @@
 3. pip3 install pyqt-builder
 
 > Go to https://pypi.org/project/PyQt5/#files and download "PyQt5-5.14.2.tar.gz
+
 > cd to the folder where you have downloaded the tar file.
 
 4. tar -xvzf PyQt5-5.14.2.tar.gz
