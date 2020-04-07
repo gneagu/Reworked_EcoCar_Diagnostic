@@ -3,13 +3,13 @@ import time
 import ast
 import cProfile
 import sys
-from PyQt4 import QtGui, QtCore
-import mainUI2
+from PyQt5 import QtGui, QtCore, QtWidgets
+from gui import mainUI2
 import sys
 
 debug = 0
 
-class TestWindow(QtGui.QMainWindow):
+class TestWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
         super(TestWindow, self).__init__()
@@ -138,7 +138,7 @@ class worker(QtCore.QThread):
 
 
 if __name__ == "__main__":
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     window = TestWindow()
     window.show()
     # QtCore.QTimer.singleShot(0, window.appinit)
