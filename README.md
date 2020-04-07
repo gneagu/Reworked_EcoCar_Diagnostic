@@ -25,6 +25,7 @@
 > Be prepared to wait half a year for the PyQt5 to install.
 
 7. pip3 install pyqt5-sip
+8. pip3 install serial
 
 **You should be done now.**
 > To verify you have installed PyQt5 correctly, run:
