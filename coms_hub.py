@@ -9,11 +9,11 @@ import sys
 
 debug = 0
 
-class TestWindow(QtWidgets.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
         super(TestWindow, self).__init__()
-        self.numOfVars = 7
+        self.numOfVars = 0
         self.buttons = []
         self.ui = mainUI2.Ui_Dialog()
         self.ui.setupUi(self)
@@ -38,7 +38,7 @@ class TestWindow(QtWidgets.QMainWindow):
     def port_connect(self):
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
-        portConnection = serial.Serial(COM_port, baud_rate, timeout=1)
+        portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
         return(portConnection)
 
     #Will set rows in tables name from here.
@@ -85,7 +85,7 @@ class TestWindow(QtWidgets.QMainWindow):
         elif sys.platform.startswith('win'):
             ports = ['COM{}'.format(i + 1) for i in range(256)]
 
-            
+
         #See if possible to open connection on port (should only open if theres an active device)
         for port in ports:
             try:
@@ -137,14 +137,37 @@ class worker(QtCore.QThread):
 
 
 
+# if __name__ == "__main__":
+#     app = QtWidgets.QApplication(sys.argv)
+#     window = TestWindow()
+#     window.show()
+#     # QtCore.QTimer.singleShot(0, window.appinit)
+#     sys.exit(app.exec_())
+
+
+
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    window = TestWindow()
-    window.show()
-    # QtCore.QTimer.singleShot(0, window.appinit)
-    sys.exit(app.exec_())
+    print("IN TRAIL")
+    ser = serial.Serial(port='COM6', baudrate=125000, bytesize=8, parity='N', stopbits=1)
+    ser.write(b'GET *VCOUNT\n')
+    ser.inWaiting()
+    x = ser.readline()
+    print(x)
+    numOfVars = x.decode(encoding='ascii').split(" ")[-1]
+    print(numOfVars)
+
+    for i in range(int(numOfVars)):
+        toSend = "GET *VN#{}\n".format(i)
+        ser.write(toSend.encode(encoding='ascii'))
+        returnString = ser.readline()
+        print(returnString.decode(encoding='ascii').split(" ")[-1])
+        print("lopp")
+        print(toSend)
 
 
+    ser.write(b'GET MOT_I\n')
+    ser.close()
+    print("DONE")
 #
 #
 # def main():
