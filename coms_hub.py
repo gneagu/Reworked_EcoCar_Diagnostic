@@ -12,7 +12,7 @@ debug = 0
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
-        super(TestWindow, self).__init__()
+        super(MainWindow, self).__init__()
         self.numOfVars = 0
         self.buttons = []
         self.ui = mainUI2.Ui_Dialog()
@@ -21,43 +21,72 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.set_pushButton_2.clicked.connect(self.appinit)
         self.ui.refresh_pushButton.clicked.connect(self.appinit2)
 
+        # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
 
-    #Initializes seperate thread.
+    # Initializes seperate thread.
     def appinit(self):
         connection = self.port_connect()
-        thread = worker(connection)
+        thread = Worker(connection)
         self.connect(thread, thread.signal, self.testfunc)
 
-        #Here should get x variables.
-        self.set_data_view_variables(connection)
+        # Get dict of values and data types from coms board
+        dict_value_type = self.get_value_name_dict(connection)
 
         thread.start()
 
-    #Taking user selection, opens a conenction on specified port.
+    # Taking user selection, opens a conenction on specified port.
     def port_connect(self):
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
         portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
         return(portConnection)
 
-    #Will set rows in tables name from here.
+
+    def get_value_name_dict(self, serial):
+        ser = serial
+        dict_value_type = {}
+
+        # Send command to get number of variables from the board.
+        ser.write(b'GET *VCOUNT\n')
+
+        # Number of variables is returned as a bit array. Ex// b'VAL *VCOUNT 11\n'
+        numOfVars = ser.readline().decode(encoding='ascii').split(" ")[-1]
+
+        # Sending "GET *VN#x" where x is number of variable returns variable name and var type.
+        for i in range(int(numOfVars)):
+            #Create string and convert to bit array.
+            bitString = "GET *VN#{}\n".format(i)
+            ser.write(bitString.encode(encoding='ascii'))
+            time.sleep(0.1)
+
+            # Value list returns as ["command sent", "variable type", "variable name"]
+            # Variable name and type returned Ex//
+            valueList = ser.readline().decode(encoding='ascii').split(" ")
+
+            # Ex// ["VAL", "*VN#1:F", "MOT_I"]
+            valueName = valueList[-1]
+            valueType = valueList[1].split(":")[-1]
+
+            # As of Python 3.7, dicts are ordered.
+            dict_value_type[valueName] = valueType
+
+        return dict_value_type
+
+    # Will set rows in tables name from here.
     def set_data_view_variables(self, connection):
-        # connection.flush()
         connection.write(b"GET *VCOUNT\n")
-        # x = connection.readline()
         print("read")
-        # print(x)
 
 
 
-    #Initializes seperate thread.
+    # Initializes seperate thread.
     def appinit2(self):
         self.ui.tableWidget.insertColumn(0)
         self.ui.tableWidget.insertColumn(1)
         self.ui.tableWidget.insertColumn(2)
 
-        #Get number of variables
+        # Given dict with variables, query board for value and upgate gui
         #
         # for i in range(self.numOfVars):
         #     #Get value of variable
@@ -85,7 +114,6 @@ class MainWindow(QtWidgets.QMainWindow):
         elif sys.platform.startswith('win'):
             ports = ['COM{}'.format(i + 1) for i in range(256)]
 
-
         #See if possible to open connection on port (should only open if theres an active device)
         for port in ports:
             try:
@@ -109,8 +137,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def update_data_view(self, data):
         pass
 
-#This is the thread that works independently on the main.
-class worker(QtCore.QThread):
+#This thread works independently on the main.
+#This one gets the
+class Worker(QtCore.QThread):
     def __init__(self, connection):
         QtCore.QThread.__init__(self, parent = app)
         self.signal = QtCore.SIGNAL("signal")
@@ -136,58 +165,9 @@ class worker(QtCore.QThread):
         self.wait()
 
 
-
-# if __name__ == "__main__":
-#     app = QtWidgets.QApplication(sys.argv)
-#     window = TestWindow()
-#     window.show()
-#     # QtCore.QTimer.singleShot(0, window.appinit)
-#     sys.exit(app.exec_())
-
-
-
 if __name__ == "__main__":
-    print("IN TRAIL")
-    ser = serial.Serial(port='COM6', baudrate=125000, bytesize=8, parity='N', stopbits=1)
-    ser.write(b'GET *VCOUNT\n')
-    ser.inWaiting()
-    x = ser.readline()
-    print(x)
-    numOfVars = x.decode(encoding='ascii').split(" ")[-1]
-    print(numOfVars)
-
-    for i in range(int(numOfVars)):
-        toSend = "GET *VN#{}\n".format(i)
-        ser.write(toSend.encode(encoding='ascii'))
-        returnString = ser.readline()
-        print(returnString.decode(encoding='ascii').split(" ")[-1])
-        print("lopp")
-        print(toSend)
-
-
-    ser.write(b'GET MOT_I\n')
-    ser.close()
-    print("DONE")
-#
-#
-# def main():
-#     ard = determinePorts()
-#     ard.flush()
-#
-#     print("Sending value: T")
-#     ard.write(b"T")
-#
-#     time.sleep(1)
-#
-#     msg = ard.readline();
-#
-#     if (debug == 1) :
-#         print("Message reeceived: ")
-#         print(msg)
-#
-#
-#     ard.close()
-#
-#     print(ast.literal_eval(msg.decode()))
-#
-#s
+    app = QtWidgets.QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    # QtCore.QTimer.singleShot(0, window.appinit)
+    sys.exit(app.exec_())
