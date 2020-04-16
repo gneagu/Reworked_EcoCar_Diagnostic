@@ -4,6 +4,7 @@ import ast
 import cProfile
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
+from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI2
 import sys
 
@@ -18,21 +19,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui = mainUI2.Ui_Dialog()
         self.ui.setupUi(self)
 
-        self.ui.set_pushButton_2.clicked.connect(self.appinit)
-        self.ui.refresh_pushButton.clicked.connect(self.appinit2)
+        self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
+        self.ui.refresh_pushButton.clicked.connect(self.appinit)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
 
     # Initializes seperate thread.
     def appinit(self):
-        connection = self.port_connect()
         thread = Worker(connection)
         self.connect(thread, thread.signal, self.testfunc)
 
         # Get dict of values and data types from coms board
-        dict_value_type = self.get_value_name_dict(connection)
-
         thread.start()
 
     # Taking user selection, opens a conenction on specified port.
@@ -73,19 +71,25 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return dict_value_type
 
-    # Will set rows in tables name from here.
-    def set_data_view_variables(self, connection):
-        connection.write(b"GET *VCOUNT\n")
-        print("read")
+    # Recieves a dict with new data from coms board, and sets appropriate columns in gui.
+    def set_data_view_variables(self):
+        self.connection = self.port_connect()
+        self.dict_value_type = self.get_value_name_dict(self.connection)
+
+        self.thread = DataCollectionThread(self.connection, self.dict_value_type)
+        self.thread.new_data_dict.connect(self.update_data_view)
+        self.thread.start()
+
+
 
 
 
     # Initializes seperate thread.
-    def appinit2(self):
-        self.ui.tableWidget.insertColumn(0)
-        self.ui.tableWidget.insertColumn(1)
-        self.ui.tableWidget.insertColumn(2)
-
+    # def appinit2(self):
+    #     self.ui.tableWidget.insertColumn(0)
+    #     self.ui.tableWidget.insertColumn(1)
+    #     self.ui.tableWidget.insertColumn(2)
+    #
         # Given dict with variables, query board for value and upgate gui
         #
         # for i in range(self.numOfVars):
@@ -135,33 +139,39 @@ class MainWindow(QtWidgets.QMainWindow):
         return(sigstr)
 
     def update_data_view(self, data):
+        print("FInally here")
+        print(data)
         pass
 
-#This thread works independently on the main.
-#This one gets the
-class Worker(QtCore.QThread):
-    def __init__(self, connection):
-        QtCore.QThread.__init__(self, parent = app)
-        self.signal = QtCore.SIGNAL("signal")
+# This thread works independently on the main.
+# This one gets each value from the
+# https://www.youtube.com/watch?v=eYJTcLBQKug
+# https://wiki.python.org/moin/PyQt5/Threading%2C_Signals_and_Slots
+class DataCollectionThread(QThread):
+
+    new_data_dict = pyqtSignal(dict)
+
+    def __init__(self, connection, value_dict):
+        QThread.__init__(self, parent = app)
         # print(connection)
+        self.threadactive = True
         self.connection = connection
+        self.value_dict = value_dict
 
     #Self.emit will emit data back to main thread.
     def run(self):
         print("Her")
         print(self.connection)
 
-        #Here get the number of variable, and return to main thread.
-
-        time.sleep(5)
-        for i in range(5):
-            time.sleep(0.1)
-            # self.ui.com_port_comboBox.addItme(i)
-            print("Loop 1")
-        print("IN THREAD")
-        self.emit(self.signal, "i from thread")
+        self.new_data_dict.emit({})
 
     def __del__(self):
+        self.wait()
+
+    # Function to kill a thread
+    # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
+    def stop(self):
+        self.threadactive = False
         self.wait()
 
 
@@ -169,5 +179,4 @@ if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    # QtCore.QTimer.singleShot(0, window.appinit)
     sys.exit(app.exec_())
