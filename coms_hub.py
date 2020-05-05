@@ -17,60 +17,84 @@ class MainWindow(QtWidgets.QMainWindow):
         self.numOfVars = 0
         self.buttons = []
         self.time_delay = 0.2
+        self.connection = 0
         self.ui = mainUI2.Ui_Dialog()
         self.ui.setupUi(self)
 
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
-        self.ui.refresh_pushButton.clicked.connect(self.kill_tread)
+        # self.ui.refresh_pushButton.clicked.connect(self.kill_tread)
+        self.ui.refresh_pushButton.clicked.connect(self.empty_table_widget)
+
+        self.ui.version_pushButton_4.clicked.connect(self.add_columns)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
 
-    # # Initializes seperate thread.
-    # def appinit(self):
-    #     thread = Worker(connection)
-    #     self.connect(thread, thread.signal, self.testfunc)
-    #
-    #     # Get dict of values and data types from coms board
-    #     thread.start()
     def kill_tread(self):
         self.thread.stop()
 
     # Taking user selection, opens a conenction on specified port.
     def port_connect(self):
-        self.time_delay = self.ui.time_spinBox.value() / 1000
+        self.time_delay = self.ui.time_spinBox.value() / 100
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
-        portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
-        return(portConnection)
+
+        #TODO: Change this. (opening connection on same port twice crashes program)
+        #But we can change com ports.
+        if not self.connection:
+            print("MAKING A NEW CONNECTION")
+
+            portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
+            self.connection = portConnection
+
+
+    # Remove rows and columns. (Needs to be reversed since removing column at start
+    # remaps proceeding)
+    def empty_table_widget(self):
+        totalColumns = self.ui.tableWidget.columnCount()
+        totalRows = self.ui.tableWidget.rowCount() 
+
+        for index in range(totalRows):
+            self.ui.tableWidget.removeRow(index)
+
+        for index in range(totalColumns)[::-1]:
+            self.ui.tableWidget.removeColumn(index)
+
+        print("done")
 
     def add_columns(self, numOfVars):
+        self.empty_table_widget()
+
         #Add columns here to table.
         self.ui.tableWidget.insertColumn(0)
         self.ui.tableWidget.insertColumn(1)
         self.ui.tableWidget.insertColumn(2)
 
-        Given dict with variables, query board for value and upgate gui
+       # Given dict with variables, query board for value and upgate gui
 
-        for i in range(self.numOfVars):
+        for i in range(int(self.numOfVars)):
             #Get value of variable
             name = "X"
 
             self.ui.tableWidget.insertRow(i)
 
-            #Create text name
-            self.ui.tableWidget.setItem(i, 0,QtGui.QTableWidgetItem(name))
-
             #Create Button to push to tableWidget
-            self.buttons.append(QtGui.QPushButton(self.ui.tableWidget))
+            self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
 
-            #Set cell as text, and button
+            #Set cell as button
             self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
 
     def get_value_name_dict(self, serial):
-        ser = serial
+        ser = self.connection
         dict_value_type = {}
+
+        print(serial)
+        print(self.connection)
+
+        # Wipe serial connection buffer
+        ser.flushInput()
+        ser.flushOutput()
 
         # Send command to get number of variables from the board.
         ser.write(b'GET *VCOUNT\n')
@@ -105,7 +129,8 @@ class MainWindow(QtWidgets.QMainWindow):
     # Recieves a dict with new data from coms board, and sends to worker thread.
     # Then starts worker thread.
     def set_data_view_variables(self):
-        self.connection = self.port_connect()
+        # self.connection = self.port_connect()
+        self.port_connect()
         self.dict_value_type = self.get_value_name_dict(self.connection)
         print(self.dict_value_type)
 
@@ -128,7 +153,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if sys.platform.startswith('linux'):
             ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
         elif sys.platform.startswith('win'):
-            ports = ['COM{}'.format(i + 1) for i in range(256)]
+            ports = ['COM{}'.format(i + 1) for i in range(255)]
 
         #See if possible to open connection on port (should only open if theres an active device)
         for port in ports:
@@ -150,6 +175,14 @@ class MainWindow(QtWidgets.QMainWindow):
     # Emmited data from DataCollectionThread come here.
     # This function updates the values in the main window.
     def update_data_view(self, data):
+        #Create text name
+        i = 0
+        for (name, value) in data.items():
+             # = data[i]
+            self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
+            self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
+            i = i + 1
+
         print("FInally here")
         print(data)
         pass
@@ -191,12 +224,16 @@ class DataCollectionThread(QThread):
                 bitString = "GET {}".format(name)
                 self.connection.write(bitString.encode(encoding='ascii'))
 
-                # Read value from Coms hub
-                value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
-                if type == 'F':
-                    values_read[name] = float(value)
-                else:
-                    values_read[name] = value
+                try:
+                    # Read value from Coms hub
+                    value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
+                    if type == 'F':
+                        values_read[name] = float(value)
+                    else:
+                        values_read[name] = value
+                except: #Sometimes get here when reset 
+                    print("Error, at reading data")
+                    pass
 
             self.new_data_dict.emit(values_read)
             time.sleep(self.time_delay)
@@ -214,32 +251,3 @@ if __name__ == "__main__":
     window.show()
     sys.exit(app.exec_())
 
-
-
-
-
-
-
-    # Initializes seperate thread.
-    # def appinit2(self):
-        # self.ui.tableWidget.insertColumn(0)
-        # self.ui.tableWidget.insertColumn(1)
-        # self.ui.tableWidget.insertColumn(2)
-        #
-        # Given dict with variables, query board for value and upgate gui
-        #
-        # for i in range(self.numOfVars):
-        #     #Get value of variable
-        #     name = "X"
-        #
-        #     self.ui.tableWidget.insertRow(i)
-        #
-        #     #Create text name
-        #     self.ui.tableWidget.setItem(i, 0,QtGui.QTableWidgetItem(name))
-        #
-        #     #Create Button to push to tableWidget
-        #     self.buttons.append(QtGui.QPushButton(self.ui.tableWidget))
-        #     self.buttons[i].setText("Graph".format(i))
-        #
-        #     #Set cell as text, and button
-        #     self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
