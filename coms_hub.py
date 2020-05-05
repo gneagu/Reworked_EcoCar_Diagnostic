@@ -70,7 +70,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.tableWidget.insertColumn(1)
         self.ui.tableWidget.insertColumn(2)
 
-       # Given dict with variables, query board for value and upgate gui
+        # Given dict with variables, query board for value and upgate gui
+
+        self.buttons = []
 
         for i in range(int(self.numOfVars)):
             #Get value of variable
