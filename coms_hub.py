@@ -50,6 +50,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Number of variables is returned as a bit array. Ex// b'VAL *VCOUNT 11\n'
         numOfVars = ser.readline().decode(encoding='ascii').split(" ")[-1]
+        self.numOfVars = numOfVars
 
         # Sending "GET *VN#x" where x is number of variable returns variable name and var type.
         for i in range(int(numOfVars)):
@@ -77,8 +78,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.dict_value_type = self.get_value_name_dict(self.connection)
         print(self.dict_value_type)
 
-        self.thread = DataCollectionThread(self.connection, self.dict_value_type)
+        #Should call function here to populate the rows and columns.
+
+        #Launch seperate thread to get variable from coms hub.
+        self.thread = DataCollectionThread()
         self.thread.new_data_dict.connect(self.update_data_view)
+        self.thread.setup(self.dict_value_type, self.connection)
         self.thread.start()
 
 
@@ -124,22 +129,36 @@ class MainWindow(QtWidgets.QMainWindow):
 # https://wiki.python.org/moin/PyQt5/Threading%2C_Signals_and_Slots
 class DataCollectionThread(QThread):
 
+    #This dict is sent as a signal from the thread that started it.
     new_data_dict = pyqtSignal(dict)
+    # print(variable_dict)
 
-    def __init__(self, connection, value_dict):
+    def __init__(self):
         QThread.__init__(self, parent = app)
-        # print(connection)
-        self.threadactive = True
-        self.connection = connection
-        self.value_dict = value_dict
+    #     # print(connection)
+        self.threadactive = False
+        self.connection = 0
+        self.value_dict = {}
+
+    def setup(self, dict_value_names, serial_con):
+        self.connection = serial_con
+        self.value_dict = dict_value_names
 
     #Self.emit will emit data back to main thread.
     def run(self):
-        for i in range(1000):
+
+        print(self.value_dict)
+
+        for i in self.value_dict:
+            bitString = "GET {}".format(i)
+            self.connection.write(bitString.encode(encoding='ascii'))
             print("HERE NUMBER: {}".format(i))
             print("Her")
             # time.sleep(1)
-            self.new_data_dict.emit({})
+            valueList = self.connection.readline().decode(encoding='ascii')
+            print(valueList)
+
+        self.new_data_dict.emit({})
 
         print(self.connection)
 
