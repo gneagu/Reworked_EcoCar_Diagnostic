@@ -62,6 +62,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         print("done")
 
+    # https://stackoverflow.com/questions/40815730/how-to-add-and-retrieve-items-to-and-from-qtablewidget
     def add_columns(self, numOfVars):
         self.empty_table_widget()
 
@@ -74,10 +75,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.buttons = []
 
-        for i in range(int(self.numOfVars)):
-            #Get value of variable
-            name = "X"
 
+        for i in range(int(self.numOfVars)):
             self.ui.tableWidget.insertRow(i)
 
             #Create Button to push to tableWidget
