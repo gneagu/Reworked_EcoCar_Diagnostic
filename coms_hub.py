@@ -5,10 +5,19 @@ import cProfile
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
-from gui import mainUI2
+from gui import mainUI2, trial
 import sys
 
 debug = 0
+
+# Not a mainwindow (Is a dialog), so need to inherit from it
+# https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
+class EventWindow(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(EventWindow, self).__init__(parent)
+        self.ui2 = trial.Ui_Dialog()
+        self.ui2.setupUi(self)
+        # self.ui2.setupUi(self)
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -20,15 +29,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.connection = 0
         self.ui = mainUI2.Ui_Dialog()
         self.ui.setupUi(self)
+        self.dialog = EventWindow(self)
+
 
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
-        # self.ui.refresh_pushButton.clicked.connect(self.kill_tread)
-        self.ui.refresh_pushButton.clicked.connect(self.empty_table_widget)
-
-        self.ui.version_pushButton_4.clicked.connect(self.add_columns)
+        self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
+        self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
+
+    def show_trial_screen(self):
+        self.dialog.show()
 
     def kill_tread(self):
         self.thread.stop()
@@ -77,7 +89,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
         for i in range(int(self.numOfVars)):
-            self.ui.tableWidget.insertRow(i)
+            self.ui.tableWidget.insertRow(i - 1)
 
             #Create Button to push to tableWidget
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
@@ -127,9 +139,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return dict_value_type
 
+    def disable_com_selections(self):
+        self.ui.set_pushButton_2.setEnabled(False)
+        self.ui.refresh_pushButton.setEnabled(False)
+        self.ui.baud_rate_lineEdit.setEnabled(False)
+        self.ui.direct_checkBox.setEnabled(False)
+        self.ui.com_port_comboBox.setEnabled(False)
+
+
+
     # Recieves a dict with new data from coms board, and sends to worker thread.
     # Then starts worker thread.
     def set_data_view_variables(self):
+        self.disable_com_selections()
         # self.connection = self.port_connect()
         self.port_connect()
         self.dict_value_type = self.get_value_name_dict(self.connection)
@@ -170,6 +192,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.com_port_comboBox.addItem("No Ports Found")
             self.ui.set_pushButton_2.setEnabled(False);
         else:
+            self.ui.set_pushButton_2.setEnabled(True);
             for port in list_of_ports:
                 self.ui.com_port_comboBox.addItem(port)
 
@@ -252,3 +275,185 @@ if __name__ == "__main__":
     window.show()
     sys.exit(app.exec_())
 
+
+
+
+
+
+# import time
+# import sys
+# from PyQt5 import QtWidgets, QtGui, QtCore
+
+# class MainWindow(QtWidgets.QMainWindow):
+#     def __init__(self, parent=None):
+#         super(MainWindow, self).__init__(parent)
+#         self.worker_thread = WorkerThread()
+#         self.worker_thread.job_done.connect(self.on_job_done)
+#         self.create_ui()
+
+#     def create_ui(self):
+#         self.button = QtWidgets.QPushButton('Test', self)
+#         self.button.clicked.connect(self.start_thread)
+#         layout = QtWidgets.QVBoxLayout(self)
+#         layout.addWidget(self.button)
+
+#     def start_thread(self):
+#         self.worker_thread.gui_text = self.button.text()
+#         self.worker_thread.start()
+
+#     def on_job_done(self, generated_str):
+#         print("Generated string : ", generated_str)
+#         self.button.setText(generated_str)
+
+
+# class WorkerThread(QtCore.QThread):
+
+#     job_done = QtCore.pyqtSignal('QString')
+
+#     def __init__(self, parent=None):
+#         super(WorkerThread, self).__init__(parent)
+#         self.gui_text = None
+
+#     def do_work(self):
+
+#         for i in range(0, 1000):
+#             print(self.gui_text)
+#             self.job_done.emit(self.gui_text + str(i))
+#             time.sleep(0.5)
+
+#     def run(self):
+#         self.do_work()
+
+
+# if __name__ == '__main__':
+#     app = QtWidgets.QApplication(sys.argv)
+#     test = MainWindow()
+#     test.show()
+#     app.exec_()
+
+# import time
+# import sys
+# from PyQt5 import QtWidgets, QtGui, QtCore
+
+# class MainWindow(QtWidgets.QMainWindow):
+#     def __init__(self, parent=None):
+#         super(MainWindow, self).__init__(parent)
+#         self.worker_thread = WorkerThread()
+#         self.worker_thread.job_done.connect(self.on_job_done)
+#         print(dir(self.worker_thread))
+#         self.create_ui()
+#         self.create_button()
+#         self.layout = 0
+
+
+
+
+#     def create_ui(self):
+#         self.button = QtWidgets.QPushButton('Test', self)
+#         self.button.clicked.connect(self.start_thread)
+#         self.layout = QtWidgets.QGridLayout(self)
+#         self.layout.addWidget(self.button)
+
+#     def create_button(self):
+#         self.xbutton = QtWidgets.QPushButton('trial', self)
+#         self.xbutton.clicked.connect(self.check_if_running)
+#         # layout = QtWidgets.QVBoxLayout(self)
+#         self.layout.addWidget(self.xbutton)
+#         self.layout.setGeometry(QtCore.QRect(120, 46, 81, 30))
+#         # self.layout.xbutton.move(50,50)
+
+#     def check_if_running(self):
+#         print("thread is running {}".format(self.worker_thread.isRunning()))
+
+#     def start_thread(self):
+#         self.worker_thread.gui_text = self.button.text()
+#         self.worker_thread.start()
+
+#     def on_job_done(self, generated_str):
+#         print("Generated string : ", generated_str)
+#         self.button.setText(generated_str)
+
+
+# class WorkerThread(QtCore.QThread):
+
+#     job_done = QtCore.pyqtSignal('QString')
+
+#     def __init__(self, parent=None):
+#         super(WorkerThread, self).__init__(parent)
+#         self.gui_text = None
+
+#     def do_work(self):
+
+#         for i in range(0, 1000):
+#             print("GUI TEXT")
+#             print(self.gui_text)
+#             self.job_done.emit(self.gui_text + str(i))
+#             time.sleep(0.5)
+
+#     def change_text(self, text):
+#         self.gui_text = text
+
+#     def run(self):
+#         self.do_work()
+
+
+# if __name__ == '__main__':
+#     app = QtWidgets.QApplication(sys.argv)
+#     test = MainWindow()
+#     test.show()
+#     app.exec_()
+
+
+
+
+# from PyQt5 import QtGui, QtCore, QtWidgets
+# import sys
+# import time
+
+
+# class Second(QtWidgets.QMainWindow):
+#     def __init__(self, parent=None):
+#         super(Second, self).__init__(parent)
+#         self.textt = "click me"
+
+#         self.pushDisButton = QtWidgets.QPushButton("trial")
+#         self.setCentralWidget(self.pushDisButton)
+
+#         self.pushDisButton.clicked.connect(self.run_this)
+       
+
+
+#     def run_this(self):
+
+
+#         for i in range(100):
+#             time.sleep(1)
+#             print("In loop")
+#             pass
+
+
+
+
+# class First(QtWidgets.QMainWindow):
+#     def __init__(self, parent=None):
+#         super(First, self).__init__(parent)
+#         self.pushButton = QtWidgets.QPushButton("click me")
+
+#         self.setCentralWidget(self.pushButton)
+
+#         self.pushButton.clicked.connect(self.on_pushButton_clicked)
+#         self.dialog = Second(self)
+
+#     def on_pushButton_clicked(self):
+#         print("CLICKED")
+#         self.dialog.show()
+
+
+# def main():
+#     app = QtWidgets.QApplication(sys.argv)
+#     main = First()
+#     main.show()
+#     sys.exit(app.exec_())
+
+# if __name__ == '__main__':
+#     main()
