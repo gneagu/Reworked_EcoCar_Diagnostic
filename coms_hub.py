@@ -31,6 +31,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui = mainUI2.Ui_Dialog()
         self.ui.setupUi(self)
         self.dialog = EventWindow(self)
+        self.dict_value_type = {}
 
 
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -88,16 +89,36 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.buttons = []
 
+        i = 0
+        print(self.dict_value_type)
 
-        for i in range(int(self.numOfVars)):
+        for name in self.dict_value_type:
+        # for i in range(int(self.numOfVars)):
             self.ui.tableWidget.insertRow(i)
 
             #Create Button to push to tableWidget
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
+            # self.buttons[i].setToolTip(str(name))
+            self.buttons[i].setToolTip('s')
 
+            print("here")
+            print(name)
             #Set cell as button
             self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
+            self.buttons[i].clicked.connect(self.on_pushButton_clicked)
+
+            i = i + 1
+
+    def on_pushButton_clicked(self):
+        print("CLICKED")
+        try:
+            print("Tooltup")
+            print(self.toolTip())
+        except:
+            print("Failed tooltip")
+        self.dialog.show()
+
 
     def get_value_name_dict(self, serial):
         ser = self.connection
@@ -117,8 +138,8 @@ class MainWindow(QtWidgets.QMainWindow):
         numOfVars = ser.readline().decode(encoding='ascii').split(" ")[-1]
         self.numOfVars = numOfVars
 
-        #Set the columns here.
-        self.add_columns(numOfVars)
+        # #Set the columns here.
+        # self.add_columns(numOfVars)
 
         # Sending "GET *VN#x" where x is number of variable returns variable name and var type.
         for i in range(int(numOfVars)):
@@ -138,6 +159,8 @@ class MainWindow(QtWidgets.QMainWindow):
             # As of Python 3.7, dicts are ordered.
             dict_value_type[valueName] = valueType
 
+
+
         return dict_value_type
 
     def disable_com_selections(self):
@@ -156,6 +179,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.connection = self.port_connect()
         self.port_connect()
         self.dict_value_type = self.get_value_name_dict(self.connection)
+
+        #Set the columns here.
+        self.add_columns(self.numOfVars)
+
         print(self.dict_value_type)
 
         #Should call function here to populate the rows and columns.
@@ -271,6 +298,25 @@ class DataCollectionThread(QThread):
 
 # Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
 # https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
+class GraphWindow(QtWidgets.QMainWindow):
+    def __init__(self, parent=None):
+        super(Second, self).__init__(parent)
+        self.textt = "click me"
+
+
+        self.pushDisButton = QtWidgets.QPushButton("trial")
+        self.setCentralWidget(self.pushDisButton)
+
+        self.pushDisButton.clicked.connect(self.run_this)
+       
+
+
+    def run_this(self):
+        for i in range(100):
+            time.sleep(1)
+            print("In loop")
+            pass
+
 
 
 if __name__ == "__main__":
