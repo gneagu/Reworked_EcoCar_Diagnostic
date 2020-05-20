@@ -17,7 +17,8 @@ class EventWindow(QtWidgets.QDialog):
         super(EventWindow, self).__init__(parent)
         self.ui2 = trial.Ui_Dialog()
         self.ui2.setupUi(self)
-        # self.ui2.setupUi(self)
+
+
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -89,7 +90,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
         for i in range(int(self.numOfVars)):
-            self.ui.tableWidget.insertRow(i - 1)
+            self.ui.tableWidget.insertRow(i)
 
             #Create Button to push to tableWidget
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
@@ -267,6 +268,9 @@ class DataCollectionThread(QThread):
     def stop(self):
         self.threadactive = False
         self.wait()
+
+# Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
+# https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
 
 
 if __name__ == "__main__":
