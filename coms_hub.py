@@ -8,7 +8,6 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI2, trial
 import sys
 import random
-import serial.tools.list_ports
 
 debug = 0
 
@@ -207,21 +206,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if debug == 0:
 
-            # if sys.platform.startswith('linux'):
-            #     ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
-            # elif sys.platform.startswith('win'):
-            #     ports = ['COM{}'.format(i + 1) for i in range(255)]
-
-            
-            #test code for reading ports
-            #can iterate over ports like before to check for active device
-            ports = serial.tools.list_ports.comports(include_links=False)
-            for p in ports:
-                print(p.device)
-
-
-
-
+            if sys.platform.startswith('linux'):
+                ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
+            elif sys.platform.startswith('win'):
+                ports = ['COM{}'.format(i + 1) for i in range(255)]
 
             #See if possible to open connection on port (should only open if theres an active device)
             for port in ports:
