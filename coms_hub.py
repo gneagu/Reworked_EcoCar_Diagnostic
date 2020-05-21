@@ -1,4 +1,5 @@
 import serial
+import serial.tools.list_ports
 import time
 import ast
 import cProfile
@@ -8,6 +9,7 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI2, trial
 import sys
 import random
+from functools import partial
 
 debug = 0
 
@@ -33,6 +35,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.setupUi(self)
         self.dialog = EventWindow(self)
         self.dict_value_type = {}
+        self.dialogs = {}
 
 
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -104,22 +107,29 @@ class MainWindow(QtWidgets.QMainWindow):
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
             # self.buttons[i].setToolTip(str(name))
-            self.buttons[i].setToolTip('s')
+            self.buttons[i].setToolTip(name)
 
             #Set cell as button
             self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
-            self.buttons[i].clicked.connect(self.on_pushButton_clicked)
+            self.buttons[i].clicked.connect(partial(self.on_pushButton_clicked, self.buttons[i]))
 
             i = i + 1
 
-    def on_pushButton_clicked(self):
+    # https://stackoverflow.com/questions/36823841/pyqt-getting-which-button-called-a-specific-function
+    def on_pushButton_clicked(self, button):
         print("CLICKED")
+        variable_name = button.toolTip()
         try:
             print("Tooltup")
-            print(self.toolTip())
+            print(variable_name)
         except:
             print("Failed tooltip")
-        self.dialog.show()
+
+        # Check if window is there, otherwise do not open window
+        if variable_name not in self.dialogs:
+            self.newWindow = EventWindow(self)
+            self.dialogs[variable_name] = self.newWindow
+        self.dialogs[variable_name].show()
 
 
     def get_value_name_dict(self, serial):
@@ -197,28 +207,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
         self.thread.start()
 
-
-
-
     # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
         list_of_ports = []
 
         if debug == 0:
+            # Much nice way to get com ports
+            # https://pyserial.readthedocs.io/en/latest/tools.html
+            port_names = list(serial.tools.list_ports.comports(include_links=False))
 
-            if sys.platform.startswith('linux'):
-                ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
-            elif sys.platform.startswith('win'):
-                ports = ['COM{}'.format(i + 1) for i in range(255)]
-
-            #See if possible to open connection on port (should only open if theres an active device)
-            for port in ports:
-                try:
-                    portConnection = serial.Serial(port)
-                    print("Connect to port: {}".format(port))
-                    list_of_ports.append(port)
-                except:
-                    pass
+            for p in port_names:
+                list_of_ports.append(p.device)
 
             #Check if any ports are available.
             if len(list_of_ports) == 0:
