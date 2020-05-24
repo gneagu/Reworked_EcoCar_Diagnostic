@@ -11,7 +11,7 @@ import sys
 import random
 from functools import partial
 
-debug = 0
+debug = 1
 
 # Not a mainwindow (Is a dialog), so need to inherit from it
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -46,6 +46,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.set_port_comboBox_selections()
 
     def show_trial_screen(self):
+        self.thread.register()
+
         self.dialog.show()
 
     def kill_tread(self):
@@ -127,7 +129,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Check if window is there, otherwise do not open window
         if variable_name not in self.dialogs:
-            self.newWindow = EventWindow(self)
+            self.newWindow = GraphWindow(self, self.thread)
+            self.thread.register([variable_name])
+            # self.newWindow = GraphWindow(self)
+
             self.dialogs[variable_name] = self.newWindow
         self.dialogs[variable_name].show()
 
@@ -248,9 +253,13 @@ class MainWindow(QtWidgets.QMainWindow):
         pass
 
 # This thread works independently on the main.
-# This one gets each value from the
+# This one gets each value from the coms hub
+# This thread will also work with logging data to a file
+# This thread will also emit data to the graph windows to be graphed. 
 # https://www.youtube.com/watch?v=eYJTcLBQKug
 # https://wiki.python.org/moin/PyQt5/Threading%2C_Signals_and_Slots
+# Going to try to keep everything in this one thread as the max number of threads
+# corresponds to the max number of processor threads that your machine has (logical processors)
 class DataCollectionThread(QThread):
 
     #This dict is sent as a signal from the thread that started it.
@@ -261,11 +270,17 @@ class DataCollectionThread(QThread):
         self.threadactive = False
         self.connection = 0
         self.value_dict = {}
+        self.connections = []
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
         self.value_dict = dict_value_names
         self.time_delay = time_delay
+
+    # Even though worker is running infinitely, can call this function and "register" windows with data.
+    def register(self):
+        print("I HAVE BEEN REGISTERED")
+        self.connections.append("1")
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -306,12 +321,20 @@ class DataCollectionThread(QThread):
                 self.new_data_dict.emit(values_read)
                 time.sleep(self.time_delay)
 
+                if len(self.connections) != 0:
+                    print(self.connections)
+
+
+
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
     def stop(self):
         self.threadactive = False
         self.wait()
+
+
+    def data_
 
 def generate_random_data():
     values = ['data1','data2','data3','data4','data5','data6']
@@ -323,25 +346,35 @@ def generate_random_data():
     return(data_dict)
 
 # Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
+# BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP ALL GUI THREADS
 # https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
-class GraphWindow(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
-        super(Second, self).__init__(parent)
-        self.textt = "click me"
+class GraphWindow(QtWidgets.QDialog):
+    # def __init__(self, parent=None):
+    def __init__(self,  trial_variable, wut):
 
+        super(GraphWindow, self).__init__()
+        self.textt = "click me"
+        print("GOT THIS")
+        print(trial_variable)
 
         self.pushDisButton = QtWidgets.QPushButton("trial")
-        self.setCentralWidget(self.pushDisButton)
+        # self.setCentralWidget(self.pushDisButton)
 
         self.pushDisButton.clicked.connect(self.run_this)
        
 
 
     def run_this(self):
-        for i in range(100):
+        for i in range(20):
             time.sleep(1)
             print("In loop")
             pass
+
+    def receive_data(self, data):
+        print("Thread {} got data".format())
+
+    def upate_button(self, data):
+        self.pushDisButton.setText(data)
 
 
 
