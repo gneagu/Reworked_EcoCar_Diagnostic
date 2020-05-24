@@ -130,10 +130,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # Check if window is there, otherwise do not open window
         if variable_name not in self.dialogs:
             self.newWindow = GraphWindow(self, self.thread)
-            self.thread.register([variable_name])
             # self.newWindow = GraphWindow(self)
 
             self.dialogs[variable_name] = self.newWindow
+            self.thread.register(self.dialogs[variable_name], variable_name)
+
         self.dialogs[variable_name].show()
 
 
@@ -270,7 +271,7 @@ class DataCollectionThread(QThread):
         self.threadactive = False
         self.connection = 0
         self.value_dict = {}
-        self.connections = []
+        self.connections = {}
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -278,9 +279,12 @@ class DataCollectionThread(QThread):
         self.time_delay = time_delay
 
     # Even though worker is running infinitely, can call this function and "register" windows with data.
-    def register(self):
+    # Essentially I just pass a pointer to the window, and the variable that it needs. 
+    def register(self, window, variable):
         print("I HAVE BEEN REGISTERED")
-        self.connections.append("1")
+        if variable not in self.connections:
+            self.connections[variable] = window
+        # self.connections.append("1")
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -323,6 +327,10 @@ class DataCollectionThread(QThread):
 
                 if len(self.connections) != 0:
                     print(self.connections)
+                    for i in self.connections:
+                        print("Calling window")
+                        print(values_read[i])
+                        self.connections[i].receive_data("{} {}".format(i, values_read[i]))
 
 
 
@@ -334,7 +342,6 @@ class DataCollectionThread(QThread):
         self.wait()
 
 
-    def data_
 
 def generate_random_data():
     values = ['data1','data2','data3','data4','data5','data6']
@@ -357,10 +364,12 @@ class GraphWindow(QtWidgets.QDialog):
         print("GOT THIS")
         print(trial_variable)
 
-        self.pushDisButton = QtWidgets.QPushButton("trial")
-        # self.setCentralWidget(self.pushDisButton)
+        self.layout = QtWidgets.QVBoxLayout()
 
-        self.pushDisButton.clicked.connect(self.run_this)
+        self.pushDisButton = QtWidgets.QPushButton("trial")
+        self.resize(630, 150)
+        self.layout.addWidget(self.pushDisButton)
+        self.setLayout(self.layout)
        
 
 
@@ -371,10 +380,11 @@ class GraphWindow(QtWidgets.QDialog):
             pass
 
     def receive_data(self, data):
-        print("Thread {} got data".format())
+        print("Window {} got data".format(data))
+        self.pushDisButton.setText(str(data))
 
     def upate_button(self, data):
-        self.pushDisButton.setText(data)
+        self.pushDisButton.setText(str(data))
 
 
 
