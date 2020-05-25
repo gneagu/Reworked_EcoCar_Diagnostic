@@ -1,15 +1,15 @@
 import serial
 import serial.tools.list_ports
 import time
-import ast
-import cProfile
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI2, trial
-import sys
 import random
 from functools import partial
+import csv
+import datetime
+import math
 
 debug = 1
 
@@ -288,68 +288,85 @@ class DataCollectionThread(QThread):
     # for variable from dictionary of value names and types.
     def run(self):
         values_read = {}
-    
-        time_start = 0
-        time_end = 0
 
-        if debug == 0:
+        self.time_stamp_thread_start = time.time() * 1000
 
-            #From the dictionary, get value name, and expected value type.
-            while True:
-                # Getting time in milliseconds
-                time_start = time.time() * 1000
+        file_name = str(datetime.datetime.now()).split(".")[0].replace(":",'-')
+
+        # https://docs.python.org/3/library/csv.html#csv.DictWriter
+        # By using DictWriter, can supply writer with a dictionary, and it will take care of placing data.
+        with open('{}.tsv'.format(file_name), 'w', newline='') as self.csvfile:
+            fieldnames = ["Timestamp"] + list(self.value_dict.keys())
+            self.writer = csv.DictWriter(self.csvfile, delimiter = "\t", fieldnames=fieldnames)
+
+            self.writer.writeheader()
+
+            if debug == 0:
+
+                #From the dictionary, get value name, and expected value type.
+                while True:
+                    # Getting time in milliseconds
+                    time_start = time.time() * 1000
+
+                    for name, type in self.value_dict.items():
+
+                        #Command to get variable
+                        bitString = "GET {}".format(name)
+                        self.connection.write(bitString.encode(encoding='ascii'))
+
+                        try:
+                            # Read value from Coms hub
+                            value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
+                            if type == 'F':
+                                values_read[name] = float(value)
+                            else:
+                                values_read[name] = value
+                        except: #Sometimes get here when reset 
+                            print("Error, at reading data")
+                            pass
+
+                    self.update_registered_windows(values_read)
+                    self.new_data_dict.emit(values_read)
+
+                    self.write_to_file(values_read)
+
+                    # Getting time in milliseconds
+                    time_end = time.time() * 1000
+
+                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                    # last, and not just y milliseconds work + x milliseconds delay
+                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+
+                    time.sleep(time_to_sleep)
+
+            else:
+                while True:
+                    # Getting time in milliseconds
+                    time_start = time.time() * 1000
+
+                    values_read = generate_random_data()
+                    self.new_data_dict.emit(values_read)
+                    self.update_registered_windows(values_read)
+
+                    # values_read[]
+
+                    self.write_to_file(values_read)
+
+                    # self.writer.writerow(values_read)
+                    # csvfile.flush()
 
 
-                for name, type in self.value_dict.items():
+                    # Getting time in milliseconds
+                    time_end = time.time() * 1000
 
-                    #Command to get variable
-                    bitString = "GET {}".format(name)
-                    self.connection.write(bitString.encode(encoding='ascii'))
-
-                    try:
-                        # Read value from Coms hub
-                        value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
-                        if type == 'F':
-                            values_read[name] = float(value)
-                        else:
-                            values_read[name] = value
-                    except: #Sometimes get here when reset 
-                        print("Error, at reading data")
-                        pass
-
-                self.update_registered_windows(values_read)
-                self.new_data_dict.emit(values_read)
-
-                # Getting time in milliseconds
-                time_end = time.time() * 1000
-
-                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                # last, and not just y milliseconds work + x milliseconds delay
-                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
-                time.sleep(time_to_sleep)
-
-        else:
-            while True:
-                # Getting time in milliseconds
-                time_start = time.time() * 1000
-
-                values_read = generate_random_data()
-                self.new_data_dict.emit(values_read)
-                self.update_registered_windows(values_read)
-
-                # Getting time in milliseconds
-                time_end = time.time() * 1000
-
-                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                # last, and not just y milliseconds work + x milliseconds delay
-                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
-                print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
-
-                time.sleep(time_to_sleep)
+                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                    # last, and not just y milliseconds work + x milliseconds delay
+                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
 
 
+                    print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+
+                    time.sleep(time_to_sleep)
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read):
@@ -361,13 +378,22 @@ class DataCollectionThread(QThread):
                 print(values_read[registered_window])
                 self.graph_window_pointers[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
 
+    # Simply write data to file and then "Flush" (write data)
+    def write_to_file(self, values):
+        #Get time stamp in miliseconds since thread start
+        timestamp = (time.time() * 1000) - self.time_stamp_thread_start
+
+        values["Timestamp"] = math.floor(timestamp)
+
+        self.writer.writerow(values)
+        self.csvfile.flush()
+
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
     def stop(self):
         self.threadactive = False
         self.wait()
-
 
 
 def generate_random_data():
