@@ -259,7 +259,7 @@ class DataCollectionThread(QThread):
         self.threadactive = False
         self.connection = 0
         self.value_dict = {}
-        self.connections = {}
+        self.graph_window_pointers = {}
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -270,8 +270,8 @@ class DataCollectionThread(QThread):
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
     def register(self, window, variable):
         print("I HAVE BEEN REGISTERED")
-        if variable not in self.connections:
-            self.connections[variable] = window
+        if variable not in self.graph_window_pointers:
+            self.graph_window_pointers[variable] = window
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -314,13 +314,13 @@ class DataCollectionThread(QThread):
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read):
-        if len(self.connections) != 0:
-            print(self.connections)
+        if len(self.graph_window_pointers) != 0:
+            print("Updating {} graph windows".format(self.graph_window_pointers))
 
-            for registered_window in self.connections:
+            for registered_window in self.graph_window_pointers:
                 print("Calling window: {}".format(registered_window))
                 print(values_read[registered_window])
-                self.connections[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
+                self.graph_window_pointers[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
 
 
     # Function to kill a thread
