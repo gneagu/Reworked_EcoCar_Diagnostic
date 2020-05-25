@@ -35,14 +35,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
 
-
-
+        # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
-
-
-
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
