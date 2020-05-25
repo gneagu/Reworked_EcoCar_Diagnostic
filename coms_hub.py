@@ -1,4 +1,5 @@
 import serial
+import serial.tools.list_ports
 import time
 import ast
 import cProfile
@@ -8,8 +9,9 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI2, trial
 import sys
 import random
+from functools import partial
 
-debug = 0
+debug = 1
 
 # Not a mainwindow (Is a dialog), so need to inherit from it
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -18,8 +20,6 @@ class EventWindow(QtWidgets.QDialog):
         super(EventWindow, self).__init__(parent)
         self.ui2 = trial.Ui_Dialog()
         self.ui2.setupUi(self)
-
-
 
 class MainWindow(QtWidgets.QMainWindow):
 
@@ -33,6 +33,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.setupUi(self)
         self.dialog = EventWindow(self)
         self.dict_value_type = {}
+        self.dialogs = {}
 
 
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -43,6 +44,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.set_port_comboBox_selections()
 
     def show_trial_screen(self):
+        self.thread.register()
+
         self.dialog.show()
 
     def kill_tread(self):
@@ -89,8 +92,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.tableWidget.insertColumn(1)
         self.ui.tableWidget.insertColumn(2)
 
-        # Given dict with variables, query board for value and upgate gui
-
         self.buttons = []
 
         i = 0
@@ -104,30 +105,39 @@ class MainWindow(QtWidgets.QMainWindow):
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
             # self.buttons[i].setToolTip(str(name))
-            self.buttons[i].setToolTip('s')
+            self.buttons[i].setToolTip(name)
 
             #Set cell as button
             self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
-            self.buttons[i].clicked.connect(self.on_pushButton_clicked)
+            self.buttons[i].clicked.connect(partial(self.on_pushButton_clicked, self.buttons[i]))
 
             i = i + 1
 
-    def on_pushButton_clicked(self):
+    # https://stackoverflow.com/questions/36823841/pyqt-getting-which-button-called-a-specific-function
+    # Each graph button in tablewidget has the tooltip set as corresponding variable name.
+    # Simply get variable name and open graph window/register with expected variable.
+    def on_pushButton_clicked(self, button):
         print("CLICKED")
+        variable_name = button.toolTip()
         try:
             print("Tooltup")
-            print(self.toolTip())
+            print(variable_name)
         except:
             print("Failed tooltip")
-        self.dialog.show()
+
+        # Check if window is there, otherwise do not open window
+        if variable_name not in self.dialogs:
+            self.newWindow = GraphWindow(self.thread, variable_name)
+
+            self.dialogs[variable_name] = self.newWindow
+            self.thread.register(self.dialogs[variable_name], variable_name)
+
+        self.dialogs[variable_name].show()
 
 
     def get_value_name_dict(self, serial):
         ser = self.connection
         dict_value_type = {}
-
-        print(serial)
-        print(self.connection)
 
         if debug == 0:
 
@@ -141,9 +151,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # Number of variables is returned as a bit array. Ex// b'VAL *VCOUNT 11\n'
             numOfVars = ser.readline().decode(encoding='ascii').split(" ")[-1]
             self.numOfVars = numOfVars
-
-            # #Set the columns here.
-            # self.add_columns(numOfVars)
 
             # Sending "GET *VN#x" where x is number of variable returns variable name and var type.
             for i in range(int(numOfVars)):
@@ -170,14 +177,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return dict_value_type
 
+    # Disable buttons after com port selected (Must restart app to choose different com port)
     def disable_com_selections(self):
         self.ui.set_pushButton_2.setEnabled(False)
         self.ui.refresh_pushButton.setEnabled(False)
         self.ui.baud_rate_lineEdit.setEnabled(False)
         self.ui.direct_checkBox.setEnabled(False)
         self.ui.com_port_comboBox.setEnabled(False)
-
-
 
     # Recieves a dict with new data from coms board, and sends to worker thread.
     # Then starts worker thread.
@@ -197,28 +203,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
         self.thread.start()
 
-
-
-
     # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
         list_of_ports = []
 
         if debug == 0:
+            # Much nice way to get com ports
+            # https://pyserial.readthedocs.io/en/latest/tools.html
+            port_names = list(serial.tools.list_ports.comports(include_links=False))
 
-            if sys.platform.startswith('linux'):
-                ports = ["/dev/ttyACM{}".format(i) for i in range(20)]
-            elif sys.platform.startswith('win'):
-                ports = ['COM{}'.format(i + 1) for i in range(255)]
-
-            #See if possible to open connection on port (should only open if theres an active device)
-            for port in ports:
-                try:
-                    portConnection = serial.Serial(port)
-                    print("Connect to port: {}".format(port))
-                    list_of_ports.append(port)
-                except:
-                    pass
+            for p in port_names:
+                list_of_ports.append(p.device)
 
             #Check if any ports are available.
             if len(list_of_ports) == 0:
@@ -233,25 +228,27 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.com_port_comboBox.addItem("DEBUG")
 
 
-    # Emmited data from DataCollectionThread come here.
+    # Emmited data from DataCollectionThread comes here.
     # This function updates the values in the main window.
     def update_data_view(self, data):
-        #Create text name
         i = 0
+
         for (name, value) in data.items():
-             # = data[i]
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
             self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
             i = i + 1
 
         print("Updating Data in Widget:")
         print(data)
-        pass
 
 # This thread works independently on the main.
-# This one gets each value from the
+# This one gets each value from the coms hub
+# This thread will also work with logging data to a file
+# This thread will also emit data to the graph windows to be graphed. 
 # https://www.youtube.com/watch?v=eYJTcLBQKug
 # https://wiki.python.org/moin/PyQt5/Threading%2C_Signals_and_Slots
+# Going to try to keep everything in this one thread as the max number of threads
+# corresponds to the max number of processor threads that your machine has (logical processors)
 class DataCollectionThread(QThread):
 
     #This dict is sent as a signal from the thread that started it.
@@ -262,20 +259,24 @@ class DataCollectionThread(QThread):
         self.threadactive = False
         self.connection = 0
         self.value_dict = {}
+        self.graph_window_pointers = {}
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
         self.value_dict = dict_value_names
         self.time_delay = time_delay
 
+    # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
+    # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
+    def register(self, window, variable):
+        print("I HAVE BEEN REGISTERED")
+        if variable not in self.graph_window_pointers:
+            self.graph_window_pointers[variable] = window
+
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
     def run(self):
-
         values_read = {}
-
-        # This is the main function of the thread. Purpose is to query coms hub
-        # for variable from dictionary of value names and types.
  
         if debug == 0:
 
@@ -297,7 +298,8 @@ class DataCollectionThread(QThread):
                     except: #Sometimes get here when reset 
                         print("Error, at reading data")
                         pass
-        
+
+                self.update_registered_windows(values_read)
                 self.new_data_dict.emit(values_read)
                 time.sleep(self.time_delay)
 
@@ -307,12 +309,27 @@ class DataCollectionThread(QThread):
                 self.new_data_dict.emit(values_read)
                 time.sleep(self.time_delay)
 
+                self.update_registered_windows(values_read)
+
+
+    # Update registered windows by sending variable data they need.
+    def update_registered_windows(self, values_read):
+        if len(self.graph_window_pointers) != 0:
+            print("Updating {} graph windows".format(self.graph_window_pointers))
+
+            for registered_window in self.graph_window_pointers:
+                print("Calling window: {}".format(registered_window))
+                print(values_read[registered_window])
+                self.graph_window_pointers[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
+
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
     def stop(self):
         self.threadactive = False
         self.wait()
+
+
 
 def generate_random_data():
     values = ['data1','data2','data3','data4','data5','data6']
@@ -324,26 +341,27 @@ def generate_random_data():
     return(data_dict)
 
 # Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
+# BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP ALL GUI THREADS
 # https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
-class GraphWindow(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
-        super(Second, self).__init__(parent)
-        self.textt = "click me"
+class GraphWindow(QtWidgets.QDialog):
+    def __init__(self,  window_pointer, set_variable):
 
+        super(GraphWindow, self).__init__()
+        self.textt = "click me"
+        print("Opened window for variable: {}".format(set_variable))
+
+        self.layout = QtWidgets.QVBoxLayout()
+        self.setWindowTitle("Graphing Variable: {}".format(set_variable))
 
         self.pushDisButton = QtWidgets.QPushButton("trial")
-        self.setCentralWidget(self.pushDisButton)
+        self.resize(630, 150)
+        self.layout.addWidget(self.pushDisButton)
+        self.setLayout(self.layout)
 
-        self.pushDisButton.clicked.connect(self.run_this)
-       
-
-
-    def run_this(self):
-        for i in range(100):
-            time.sleep(1)
-            print("In loop")
-            pass
-
+    # This function receives data from the DataCollectionThread
+    def receive_data(self, data):
+        print("Window {} got data".format(data))
+        self.pushDisButton.setText(str(data))
 
 
 if __name__ == "__main__":
