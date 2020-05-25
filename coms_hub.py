@@ -21,8 +21,6 @@ class EventWindow(QtWidgets.QDialog):
         self.ui2 = trial.Ui_Dialog()
         self.ui2.setupUi(self)
 
-
-
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self):
@@ -94,8 +92,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.tableWidget.insertColumn(1)
         self.ui.tableWidget.insertColumn(2)
 
-        # Given dict with variables, query board for value and upgate gui
-
         self.buttons = []
 
         i = 0
@@ -118,6 +114,8 @@ class MainWindow(QtWidgets.QMainWindow):
             i = i + 1
 
     # https://stackoverflow.com/questions/36823841/pyqt-getting-which-button-called-a-specific-function
+    # Each graph button in tablewidget has the tooltip set as corresponding variable name.
+    # Simply get variable name and open graph window/register with expected variable.
     def on_pushButton_clicked(self, button):
         print("CLICKED")
         variable_name = button.toolTip()
@@ -129,8 +127,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Check if window is there, otherwise do not open window
         if variable_name not in self.dialogs:
-            self.newWindow = GraphWindow(self, self.thread)
-            # self.newWindow = GraphWindow(self)
+            self.newWindow = GraphWindow(self.thread, variable_name)
 
             self.dialogs[variable_name] = self.newWindow
             self.thread.register(self.dialogs[variable_name], variable_name)
@@ -141,9 +138,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def get_value_name_dict(self, serial):
         ser = self.connection
         dict_value_type = {}
-
-        print(serial)
-        print(self.connection)
 
         if debug == 0:
 
@@ -157,9 +151,6 @@ class MainWindow(QtWidgets.QMainWindow):
             # Number of variables is returned as a bit array. Ex// b'VAL *VCOUNT 11\n'
             numOfVars = ser.readline().decode(encoding='ascii').split(" ")[-1]
             self.numOfVars = numOfVars
-
-            # #Set the columns here.
-            # self.add_columns(numOfVars)
 
             # Sending "GET *VN#x" where x is number of variable returns variable name and var type.
             for i in range(int(numOfVars)):
@@ -186,14 +177,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return dict_value_type
 
+    # Disable buttons after com port selected (Must restart app to choose different com port)
     def disable_com_selections(self):
         self.ui.set_pushButton_2.setEnabled(False)
         self.ui.refresh_pushButton.setEnabled(False)
         self.ui.baud_rate_lineEdit.setEnabled(False)
         self.ui.direct_checkBox.setEnabled(False)
         self.ui.com_port_comboBox.setEnabled(False)
-
-
 
     # Recieves a dict with new data from coms board, and sends to worker thread.
     # Then starts worker thread.
@@ -238,20 +228,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self.ui.com_port_comboBox.addItem("DEBUG")
 
 
-    # Emmited data from DataCollectionThread come here.
+    # Emmited data from DataCollectionThread comes here.
     # This function updates the values in the main window.
     def update_data_view(self, data):
-        #Create text name
         i = 0
+
         for (name, value) in data.items():
-             # = data[i]
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
             self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
             i = i + 1
 
         print("Updating Data in Widget:")
         print(data)
-        pass
 
 # This thread works independently on the main.
 # This one gets each value from the coms hub
@@ -278,22 +266,17 @@ class DataCollectionThread(QThread):
         self.value_dict = dict_value_names
         self.time_delay = time_delay
 
-    # Even though worker is running infinitely, can call this function and "register" windows with data.
-    # Essentially I just pass a pointer to the window, and the variable that it needs. 
+    # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
+    # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
     def register(self, window, variable):
         print("I HAVE BEEN REGISTERED")
         if variable not in self.connections:
             self.connections[variable] = window
-        # self.connections.append("1")
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
     def run(self):
-
         values_read = {}
-
-        # This is the main function of the thread. Purpose is to query coms hub
-        # for variable from dictionary of value names and types.
  
         if debug == 0:
 
@@ -315,7 +298,8 @@ class DataCollectionThread(QThread):
                     except: #Sometimes get here when reset 
                         print("Error, at reading data")
                         pass
-        
+
+                self.update_registered_windows(values_read)
                 self.new_data_dict.emit(values_read)
                 time.sleep(self.time_delay)
 
@@ -325,14 +309,18 @@ class DataCollectionThread(QThread):
                 self.new_data_dict.emit(values_read)
                 time.sleep(self.time_delay)
 
-                if len(self.connections) != 0:
-                    print(self.connections)
-                    for i in self.connections:
-                        print("Calling window")
-                        print(values_read[i])
-                        self.connections[i].receive_data("{} {}".format(i, values_read[i]))
+                self.update_registered_windows(values_read)
 
 
+    # Update registered windows by sending variable data they need.
+    def update_registered_windows(self, values_read):
+        if len(self.connections) != 0:
+            print(self.connections)
+
+            for registered_window in self.connections:
+                print("Calling window: {}".format(registered_window))
+                print(values_read[registered_window])
+                self.connections[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
 
 
     # Function to kill a thread
@@ -356,36 +344,24 @@ def generate_random_data():
 # BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP ALL GUI THREADS
 # https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
 class GraphWindow(QtWidgets.QDialog):
-    # def __init__(self, parent=None):
-    def __init__(self,  trial_variable, wut):
+    def __init__(self,  window_pointer, set_variable):
 
         super(GraphWindow, self).__init__()
         self.textt = "click me"
-        print("GOT THIS")
-        print(trial_variable)
+        print("Opened window for variable: {}".format(set_variable))
 
         self.layout = QtWidgets.QVBoxLayout()
+        self.setWindowTitle("Graphing Variable: {}".format(set_variable))
 
         self.pushDisButton = QtWidgets.QPushButton("trial")
         self.resize(630, 150)
         self.layout.addWidget(self.pushDisButton)
         self.setLayout(self.layout)
-       
 
-
-    def run_this(self):
-        for i in range(20):
-            time.sleep(1)
-            print("In loop")
-            pass
-
+    # This function receives data from the DataCollectionThread
     def receive_data(self, data):
         print("Window {} got data".format(data))
         self.pushDisButton.setText(str(data))
-
-    def upate_button(self, data):
-        self.pushDisButton.setText(str(data))
-
 
 
 if __name__ == "__main__":
