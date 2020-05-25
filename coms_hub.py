@@ -27,18 +27,22 @@ class MainWindow(QtWidgets.QMainWindow):
         super(MainWindow, self).__init__()
         self.numOfVars = 0
         self.buttons = []
-        self.time_delay = 0.2
         self.connection = 0
         self.ui = mainUI2.Ui_Dialog()
         self.ui.setupUi(self)
         self.dialog = EventWindow(self)
         self.dict_value_type = {}
         self.dialogs = {}
+        self.time_delay = self.ui.time_spinBox.value()
+
 
 
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
+
+
+
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -53,7 +57,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Taking user selection, opens a conenction on specified port.
     def port_connect(self):
-        self.time_delay = self.ui.time_spinBox.value() / 100
+        self.time_delay = self.ui.time_spinBox.value()
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
 
@@ -120,7 +124,7 @@ class MainWindow(QtWidgets.QMainWindow):
         print("CLICKED")
         variable_name = button.toolTip()
         try:
-            print("Tooltup")
+            print("Tooltip")
             print(variable_name)
         except:
             print("Failed tooltip")
@@ -141,7 +145,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if debug == 0:
 
-            # Wipe serial connection buffer
+            # Wipe com port buffer
             ser.flushInput()
             ser.flushOutput()
 
@@ -202,6 +206,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # https://stackoverflow.com/questions/45668961/send-data-to-qthread-when-in-have-changes-in-gui-windows-pyqt5
         self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
         self.thread.start()
+
+        # Connect spinbox to worker thread, but only after thread created.
+        self.ui.time_spinBox.valueChanged.connect(self.thread.change_delay)
 
     # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
@@ -266,6 +273,10 @@ class DataCollectionThread(QThread):
         self.value_dict = dict_value_names
         self.time_delay = time_delay
 
+    def change_delay(self, new_time_delay):
+        print("Delay has been changed to: {}".format(new_time_delay))
+        self.time_delay = new_time_delay
+
     # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
     def register(self, window, variable):
@@ -277,11 +288,18 @@ class DataCollectionThread(QThread):
     # for variable from dictionary of value names and types.
     def run(self):
         values_read = {}
- 
+    
+        time_start = 0
+        time_end = 0
+
         if debug == 0:
 
             #From the dictionary, get value name, and expected value type.
             while True:
+                # Getting time in milliseconds
+                time_start = time.time() * 1000
+
+
                 for name, type in self.value_dict.items():
 
                     #Command to get variable
@@ -301,15 +319,36 @@ class DataCollectionThread(QThread):
 
                 self.update_registered_windows(values_read)
                 self.new_data_dict.emit(values_read)
-                time.sleep(self.time_delay)
+
+                # Getting time in milliseconds
+                time_end = time.time() * 1000
+
+                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                # last, and not just y milliseconds work + x milliseconds delay
+                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+
+                time.sleep(time_to_sleep)
 
         else:
             while True:
+                # Getting time in milliseconds
+                time_start = time.time() * 1000
+
                 values_read = generate_random_data()
                 self.new_data_dict.emit(values_read)
-                time.sleep(self.time_delay)
-
                 self.update_registered_windows(values_read)
+
+                # Getting time in milliseconds
+                time_end = time.time() * 1000
+
+                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                # last, and not just y milliseconds work + x milliseconds delay
+                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+
+                print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+
+                time.sleep(time_to_sleep)
+
 
 
     # Update registered windows by sending variable data they need.

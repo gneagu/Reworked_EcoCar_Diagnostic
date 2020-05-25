@@ -81,7 +81,7 @@ class Ui_Dialog(object):
         self.label_2.setObjectName(_fromUtf8("label_2"))
         self.time_spinBox = QtWidgets.QSpinBox(self.frame_2)
         self.time_spinBox.setGeometry(QtCore.QRect(90, 10, 61, 22))
-        self.time_spinBox.setMinimum(200)
+        self.time_spinBox.setMinimum(50)
         self.time_spinBox.setMaximum(999999)
         self.time_spinBox.setObjectName(_fromUtf8("time_spinBox"))
         self.label_3 = QtWidgets.QLabel(self.frame_2)
