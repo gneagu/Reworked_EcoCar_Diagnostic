@@ -1,15 +1,20 @@
 import serial
 import serial.tools.list_ports
 import time
-import ast
-import cProfile
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI2, trial
-import sys
 import random
 from functools import partial
+import csv
+import datetime
+import math
+import tkinter
+from shutil import copy
+from tkinter import filedialog
+import tkinter as tk
+import os
 
 debug = 1
 
@@ -35,14 +40,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
 
-
-
+        # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
-
-
-
+        self.ui.export_pushButton_5.clicked.connect(self.open_file_save_dialog)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -52,8 +54,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.dialog.show()
 
-    def kill_tread(self):
-        self.thread.stop()
+    # Over-riding close event so I can end the DataCollectionThread also.
+    def closeEvent(self, event):
+        # do stuff
+        self.thread.killthread()
+        event.accept() # let the window close
 
     # Taking user selection, opens a conenction on specified port.
     def port_connect(self):
@@ -61,8 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
 
-        #TODO: Change this. (opening connection on same port twice crashes program)
-        #But we can change com ports.
+
         if debug == 0:
 
             if not self.connection:
@@ -73,6 +77,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         else:
             pass
+
+    # Need to launch from contet of widget for dialog to open (little weird)
+    # Need to send context of widget to the function in the DatCollectionThread
+    def open_file_save_dialog(self):
+        self.thread.save_data_file(self)
+
+
 
     # Remove rows and columns. (Needs to be reversed since removing column at start
     # remaps proceeding)
@@ -288,68 +299,79 @@ class DataCollectionThread(QThread):
     # for variable from dictionary of value names and types.
     def run(self):
         values_read = {}
-    
-        time_start = 0
-        time_end = 0
 
-        if debug == 0:
+        self.time_stamp_thread_start = time.time() * 1000
 
-            #From the dictionary, get value name, and expected value type.
-            while True:
-                # Getting time in milliseconds
-                time_start = time.time() * 1000
+        self.file_name = str(datetime.datetime.now()).split(".")[0].replace(":",'-') + '.tsv'
+
+        # https://docs.python.org/3/library/csv.html#csv.DictWriter
+        # By using DictWriter, can supply writer with a dictionary, and it will take care of placing data.
+        with open('temp/{}'.format(self.file_name), 'w', newline='') as self.csvfile:
+            fieldnames = ["Timestamp"] + list(self.value_dict.keys())
+            self.writer = csv.DictWriter(self.csvfile, delimiter = "\t", fieldnames=fieldnames)
+
+            self.writer.writeheader()
+
+            if debug == 0:
+
+                #From the dictionary, get value name, and expected value type.
+                while True:
+                    # Getting time in milliseconds
+                    time_start = time.time() * 1000
+
+                    for name, type in self.value_dict.items():
+
+                        #Command to get variable
+                        bitString = "GET {}".format(name)
+                        self.connection.write(bitString.encode(encoding='ascii'))
+
+                        try:
+                            # Read value from Coms hub
+                            value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
+                            if type == 'F':
+                                values_read[name] = float(value)
+                            else:
+                                values_read[name] = value
+                        except: #Sometimes get here when reset 
+                            print("Error, at reading data")
+                            pass
+
+                    self.update_registered_windows(values_read)
+                    self.new_data_dict.emit(values_read)
+
+                    self.write_to_file(values_read)
+
+                    # Getting time in milliseconds
+                    time_end = time.time() * 1000
+
+                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                    # last, and not just y milliseconds work + x milliseconds delay
+                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+
+                    time.sleep(time_to_sleep)
+
+            else:
+                while True:
+                    # Getting time in milliseconds
+                    time_start = time.time() * 1000
+
+                    values_read = generate_random_data()
+                    self.new_data_dict.emit(values_read)
+                    self.update_registered_windows(values_read)
+
+                    self.write_to_file(values_read)
+
+                    # Getting time in milliseconds
+                    time_end = time.time() * 1000
+
+                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                    # last, and not just y milliseconds work + x milliseconds delay
+                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
 
 
-                for name, type in self.value_dict.items():
+                    print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
-                    #Command to get variable
-                    bitString = "GET {}".format(name)
-                    self.connection.write(bitString.encode(encoding='ascii'))
-
-                    try:
-                        # Read value from Coms hub
-                        value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
-                        if type == 'F':
-                            values_read[name] = float(value)
-                        else:
-                            values_read[name] = value
-                    except: #Sometimes get here when reset 
-                        print("Error, at reading data")
-                        pass
-
-                self.update_registered_windows(values_read)
-                self.new_data_dict.emit(values_read)
-
-                # Getting time in milliseconds
-                time_end = time.time() * 1000
-
-                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                # last, and not just y milliseconds work + x milliseconds delay
-                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
-                time.sleep(time_to_sleep)
-
-        else:
-            while True:
-                # Getting time in milliseconds
-                time_start = time.time() * 1000
-
-                values_read = generate_random_data()
-                self.new_data_dict.emit(values_read)
-                self.update_registered_windows(values_read)
-
-                # Getting time in milliseconds
-                time_end = time.time() * 1000
-
-                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                # last, and not just y milliseconds work + x milliseconds delay
-                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
-                print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
-
-                time.sleep(time_to_sleep)
-
-
+                    time.sleep(time_to_sleep)
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read):
@@ -361,13 +383,46 @@ class DataCollectionThread(QThread):
                 print(values_read[registered_window])
                 self.graph_window_pointers[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
 
+    # Simply write data to file and then "Flush" (write data)
+    def write_to_file(self, values):
+        #Get time stamp in miliseconds since thread start
+        timestamp = (time.time() * 1000) - self.time_stamp_thread_start
+
+        values["Timestamp"] = math.floor(timestamp)
+
+        self.writer.writerow(values)
+        self.csvfile.flush()
+
+    # https://stackoverflow.com/questions/15416334/qfiledialog-how-to-set-default-filename-in-save-as-dialog
+    # Open a dialog to determine save location, and then copy file from the temp location.
+    def save_data_file(self, parent_window):
+        destination_location = str(QtWidgets.QFileDialog.getSaveFileName(parent_window, "Select Directory", self.file_name)[0])
+        print(destination_location)
+
+        source_location = './temp/{}'.format(self.file_name)
+        print("Save location: {}".format(source_location))
+
+        copy(source_location, destination_location)
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
-    def stop(self):
-        self.threadactive = False
-        self.wait()
+    def killthread(self):
 
+        # End thread
+        self.threadactive = False
+        self.quit()
+        self.terminate()
+
+        # Release file so we can close it
+        self.csvfile.close()
+
+        # Delete data file if it has not been saved.
+        try:
+            location = '{}/temp/{}'.format(os.getcwd(), self.file_name).replace('\\','''/''')
+            print(location)
+            os.remove(location)
+        except:
+            print("Could not remove file from temp folder")
 
 
 def generate_random_data():

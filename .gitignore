@@ -1,3 +1,6 @@
 __pycache__/*
 __pycache__
 
+*.tsv
+
+!20200520_043047.tsv
