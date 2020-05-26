@@ -117,9 +117,16 @@ class MainWindow(QtWidgets.QMainWindow):
             i = i + 1
 
     def on_pushButton_clicked(self):
-        graph = Graphing()
-        graph.run()
+    
+        self.graph_worker = Graphing()
+        self.graph_worker_thread = QThread()
 
+        self.graph_worker.moveToThread(self.graph_worker_thread)
+        self.graph_worker_thread.start()
+
+
+        #connect signals to Graphing() class
+        self.graph_worker.run()
 
         print("CLICKED")
         try:
@@ -332,14 +339,21 @@ def generate_random_data():
 class GraphWindow:
     #creates a window for graphing
 
+    
+
     value = 0
 
     def __init__(self):
+        super(GraphWindow, self).__init__()
+
         self.win = pg.GraphicsWindow(title="Signal from serial port") 
         self.p = self.win.addPlot(title="Realtime plot")  
-        self.curve = self.p.plot()                        
+        self.curve = self.p.plot()
 
-        self.windowWidth = 500                       # width of the window displaying the curve
+        self.win.resize(450,300)
+
+
+        self.windowWidth = 300                       # width of the window displaying the curve
         self.Xm = linspace(0,0,self.windowWidth)          # create array that will contain the relevant time series     
         self.ptr = -self.windowWidth                      # set first x position
 
@@ -352,20 +366,20 @@ class GraphWindow:
         QtGui.QApplication.processEvents()
 
 
-class Graphing(GraphWindow):
-    #right now the program is using variables but can easily change to serial 
-
-
+class Graphing(GraphWindow, QThread):
     # portName = "COM12"                      
     # baudrate = 9600
     # ser = serial.Serial(portName,baudrate)
 
+    def __init__(self):
+        super(Graphing, self).__init__()
 
     def run(self):
         while True: 
             self.value = uniform(0,10)
             # self.value = ser.readline()
             self.update()
+
 
 
 
