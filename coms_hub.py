@@ -9,8 +9,11 @@ from gui import mainUI2, trial
 import sys
 import random
 import serial.tools.list_ports
+from random import randrange, uniform
+import pyqtgraph as pg
+from numpy import *
 
-debug = 0
+debug = 1
 
 # Not a mainwindow (Is a dialog), so need to inherit from it
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -114,6 +117,10 @@ class MainWindow(QtWidgets.QMainWindow):
             i = i + 1
 
     def on_pushButton_clicked(self):
+        graph = Graphing()
+        graph.run()
+
+
         print("CLICKED")
         try:
             print("Tooltup")
@@ -211,8 +218,8 @@ class MainWindow(QtWidgets.QMainWindow):
             
             for port in ports:
                 try:
-                    portConnection = serial.Serial(port.device)
-                    print("Connect to port: {}".format(port.device))
+                    portConnection = serial.Serial(port)
+                    print("Connect to port: {}".format(port))
                     list_of_ports.append(port)
                 except:
                     pass
@@ -320,26 +327,49 @@ def generate_random_data():
 
     return(data_dict)
 
-# Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
-# https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
-class GraphWindow(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
-        super(Second, self).__init__(parent)
-        self.textt = "click me"
+# Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions.
+
+class GraphWindow:
+    #creates a window for graphing
+
+    value = 0
+
+    def __init__(self):
+        self.win = pg.GraphicsWindow(title="Signal from serial port") 
+        self.p = self.win.addPlot(title="Realtime plot")  
+        self.curve = self.p.plot()                        
+
+        self.windowWidth = 500                       # width of the window displaying the curve
+        self.Xm = linspace(0,0,self.windowWidth)          # create array that will contain the relevant time series     
+        self.ptr = -self.windowWidth                      # set first x position
+
+    def update(self):    
+        self.Xm[:-1] = self.Xm[1:]                      # shift data in the temporal mean 1 sample left
+        self.Xm[-1] = float(self.value)                 # vector containing the instantaneous values      
+        self.ptr += 1                              # update x position for displaying the curve
+        self.curve.setData(self.Xm)                     # set the curve with this data
+        self.curve.setPos(self.ptr,0)                   # set x position in the graph to 0
+        QtGui.QApplication.processEvents()
 
 
-        self.pushDisButton = QtWidgets.QPushButton("trial")
-        self.setCentralWidget(self.pushDisButton)
-
-        self.pushDisButton.clicked.connect(self.run_this)
-       
+class Graphing(GraphWindow):
+    #right now the program is using variables but can easily change to serial 
 
 
-    def run_this(self):
-        for i in range(100):
-            time.sleep(1)
-            print("In loop")
-            pass
+    # portName = "COM12"                      
+    # baudrate = 9600
+    # ser = serial.Serial(portName,baudrate)
+
+
+    def run(self):
+        while True: 
+            self.value = uniform(0,10)
+            # self.value = ser.readline()
+            self.update()
+
+
+
+
 
 
 
