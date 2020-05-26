@@ -16,6 +16,10 @@ from tkinter import filedialog
 import tkinter as tk
 import os
 
+from pyqtgraph import PlotWidget, plot
+import pyqtgraph as pg
+from numpy import linspace
+
 debug = 1
 
 # Not a mainwindow (Is a dialog), so need to inherit from it
@@ -371,7 +375,8 @@ class DataCollectionThread(QThread):
 
                     print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
-                    time.sleep(time_to_sleep)
+                    if time_to_sleep > 0:
+                        time.sleep(time_to_sleep)
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read):
@@ -381,7 +386,7 @@ class DataCollectionThread(QThread):
             for registered_window in self.graph_window_pointers:
                 print("Calling window: {}".format(registered_window))
                 print(values_read[registered_window])
-                self.graph_window_pointers[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
+                self.graph_window_pointers[registered_window].receive_data(str(values_read[registered_window]))
 
     # Simply write data to file and then "Flush" (write data)
     def write_to_file(self, values):
@@ -437,25 +442,40 @@ def generate_random_data():
 # Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
 # BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP ALL GUI THREADS
 # https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
+
+
+
 class GraphWindow(QtWidgets.QDialog):
     def __init__(self,  window_pointer, set_variable):
 
         super(GraphWindow, self).__init__()
-        self.textt = "click me"
         print("Opened window for variable: {}".format(set_variable))
 
         self.layout = QtWidgets.QVBoxLayout()
+
+
+        self.graphWidget = pg.PlotWidget()
         self.setWindowTitle("Graphing Variable: {}".format(set_variable))
 
-        self.pushDisButton = QtWidgets.QPushButton("trial")
-        self.resize(630, 150)
-        self.layout.addWidget(self.pushDisButton)
+
+        self.windowWidth = 300                       # width of the window displaying the curve
+        self.Xm = linspace(0,0,self.windowWidth)          # create array that will contain the relevant time series     
+        self.ptr = -self.windowWidth                      # set first x position
+        
+        self.layout.addWidget(self.graphWidget)
         self.setLayout(self.layout)
+
 
     # This function receives data from the DataCollectionThread
     def receive_data(self, data):
-        print("Window {} got data".format(data))
-        self.pushDisButton.setText(str(data))
+        # self.Xm.pop(0)
+        # self.Xm.append(data)
+        self.Xm[:-1] = self.Xm[1:]                      # shift data in the temporal mean 1 sample left
+        self.Xm[-1] = data                 # vector containing the instantaneous values      
+        self.ptr += 1                              # update x position for displaying the curve
+        self.graphWidget.plot().setData(self.Xm)                     # set the curve with this data
+        self.graphWidget.plot().setPos(self.ptr,0)                   # set x position in the graph to 0
+        QtGui.QApplication.processEvents()
 
 
 if __name__ == "__main__":
