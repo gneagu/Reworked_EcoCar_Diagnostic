@@ -14,6 +14,7 @@ import tkinter
 from shutil import copy
 from tkinter import filedialog
 import tkinter as tk
+import os
 
 debug = 1
 
@@ -43,7 +44,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
-        self.ui.export_pushButton_5.clicked.connect(self.save_data_file)
+        self.ui.export_pushButton_5.clicked.connect(self.open_file_save_dialog)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -53,8 +54,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.dialog.show()
 
-    def kill_tread(self):
-        self.thread.stop()
+    # Over-riding close event so I can end the DataCollectionThread also.
+    def closeEvent(self, event):
+        # do stuff
+        self.thread.killthread()
+        event.accept() # let the window close
 
     # Taking user selection, opens a conenction on specified port.
     def port_connect(self):
@@ -62,8 +66,7 @@ class MainWindow(QtWidgets.QMainWindow):
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
 
-        #TODO: Change this. (opening connection on same port twice crashes program)
-        #But we can change com ports.
+
         if debug == 0:
 
             if not self.connection:
@@ -76,7 +79,8 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
 
     # Need to launch from contet of widget for dialog to open (little weird)
-    def save_data_file(self):
+    # Need to send context of widget to the function in the DatCollectionThread
+    def open_file_save_dialog(self):
         self.thread.save_data_file(self)
 
 
@@ -213,11 +217,6 @@ class MainWindow(QtWidgets.QMainWindow):
         # https://stackoverflow.com/questions/45668961/send-data-to-qthread-when-in-have-changes-in-gui-windows-pyqt5
         self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
         self.thread.start()
-
-        
-        
-        # self.ui.export_pushButton_5.clicked.connect(self.thread.save_data_file)
-
 
         # Connect spinbox to worker thread, but only after thread created.
         self.ui.time_spinBox.valueChanged.connect(self.thread.change_delay)
@@ -360,13 +359,7 @@ class DataCollectionThread(QThread):
                     self.new_data_dict.emit(values_read)
                     self.update_registered_windows(values_read)
 
-                    # values_read[]
-
                     self.write_to_file(values_read)
-
-                    # self.writer.writerow(values_read)
-                    # csvfile.flush()
-
 
                     # Getting time in milliseconds
                     time_end = time.time() * 1000
@@ -400,7 +393,8 @@ class DataCollectionThread(QThread):
         self.writer.writerow(values)
         self.csvfile.flush()
 
-
+    # https://stackoverflow.com/questions/15416334/qfiledialog-how-to-set-default-filename-in-save-as-dialog
+    # Open a dialog to determine save location, and then copy file from the temp location.
     def save_data_file(self, parent_window):
         destination_location = str(QtWidgets.QFileDialog.getSaveFileName(parent_window, "Select Directory", self.file_name)[0])
         print(destination_location)
@@ -412,9 +406,23 @@ class DataCollectionThread(QThread):
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
-    def stop(self):
+    def killthread(self):
+
+        # End thread
         self.threadactive = False
-        self.wait()
+        self.quit()
+        self.terminate()
+
+        # Release file so we can close it
+        self.csvfile.close()
+
+        # Delete data file if it has not been saved.
+        try:
+            location = '{}/temp/{}'.format(os.getcwd(), self.file_name).replace('\\','''/''')
+            print(location)
+            os.remove(location)
+        except:
+            print("Could not remove file from temp folder")
 
 
 def generate_random_data():
