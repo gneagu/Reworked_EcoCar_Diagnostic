@@ -10,6 +10,10 @@ from functools import partial
 import csv
 import datetime
 import math
+import tkinter
+from shutil import copy
+from tkinter import filedialog
+import tkinter as tk
 
 debug = 1
 
@@ -39,6 +43,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
+        # self.ui.export_pushButton_5.clicked.connect(self.save_data_file)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -69,6 +74,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         else:
             pass
+
+
 
     # Remove rows and columns. (Needs to be reversed since removing column at start
     # remaps proceeding)
@@ -203,6 +210,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
         self.thread.start()
 
+        
+        
+        self.ui.export_pushButton_5.clicked.connect(self.thread.save_data_file)
+
+
         # Connect spinbox to worker thread, but only after thread created.
         self.ui.time_spinBox.valueChanged.connect(self.thread.change_delay)
 
@@ -287,11 +299,11 @@ class DataCollectionThread(QThread):
 
         self.time_stamp_thread_start = time.time() * 1000
 
-        file_name = str(datetime.datetime.now()).split(".")[0].replace(":",'-')
+        self.file_name = str(datetime.datetime.now()).split(".")[0].replace(":",'-') + '.tsv'
 
         # https://docs.python.org/3/library/csv.html#csv.DictWriter
         # By using DictWriter, can supply writer with a dictionary, and it will take care of placing data.
-        with open('{}.tsv'.format(file_name), 'w', newline='') as self.csvfile:
+        with open('temp/{}'.format(self.file_name), 'w', newline='') as self.csvfile:
             fieldnames = ["Timestamp"] + list(self.value_dict.keys())
             self.writer = csv.DictWriter(self.csvfile, delimiter = "\t", fieldnames=fieldnames)
 
@@ -384,6 +396,19 @@ class DataCollectionThread(QThread):
         self.writer.writerow(values)
         self.csvfile.flush()
 
+
+    def save_data_file(self):
+        destination_location = filedialog.askdirectory()
+
+
+        root = tk.Tk()
+        root.withdraw()
+
+        # file_path = filedialog.askopenfilename()
+        source_location = './temp/{}'.format(self.file_name)
+        print("Save location: {}".format(source_location))
+
+        copy(source_location, destination_location)
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
