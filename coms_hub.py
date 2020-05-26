@@ -43,7 +43,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
-        # self.ui.export_pushButton_5.clicked.connect(self.save_data_file)
+        self.ui.export_pushButton_5.clicked.connect(self.save_data_file)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -74,6 +74,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         else:
             pass
+
+    # Need to launch from contet of widget for dialog to open (little weird)
+    def save_data_file(self):
+        self.thread.save_data_file(self)
 
 
 
@@ -212,7 +216,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         
         
-        self.ui.export_pushButton_5.clicked.connect(self.thread.save_data_file)
+        # self.ui.export_pushButton_5.clicked.connect(self.thread.save_data_file)
 
 
         # Connect spinbox to worker thread, but only after thread created.
@@ -397,14 +401,10 @@ class DataCollectionThread(QThread):
         self.csvfile.flush()
 
 
-    def save_data_file(self):
-        destination_location = filedialog.askdirectory()
+    def save_data_file(self, parent_window):
+        destination_location = str(QtWidgets.QFileDialog.getSaveFileName(parent_window, "Select Directory", self.file_name)[0])
+        print(destination_location)
 
-
-        root = tk.Tk()
-        root.withdraw()
-
-        # file_path = filedialog.askopenfilename()
         source_location = './temp/{}'.format(self.file_name)
         print("Save location: {}".format(source_location))
 
