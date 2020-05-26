@@ -327,6 +327,7 @@ class DataCollectionThread(QThread):
                 while True:
                     # Getting time in milliseconds
                     time_start = time.time() * 1000
+                    timestamp = time_start - self.time_stamp_thread_start
 
                     for name, type in self.value_dict.items():
 
@@ -345,7 +346,7 @@ class DataCollectionThread(QThread):
                             print("Error, at reading data")
                             pass
 
-                    self.update_registered_windows(values_read)
+                    self.update_registered_windows(values_read, timestamp)
                     self.new_data_dict.emit(values_read)
 
                     self.write_to_file(values_read)
@@ -363,10 +364,11 @@ class DataCollectionThread(QThread):
                 while True:
                     # Getting time in milliseconds
                     time_start = time.time() * 1000
+                    timestamp = time_start - self.time_stamp_thread_start
 
                     values_read = generate_random_data()
                     self.new_data_dict.emit(values_read)
-                    self.update_registered_windows(values_read)
+                    self.update_registered_windows(values_read, timestamp)
 
                     self.write_to_file(values_read)
 
@@ -384,14 +386,14 @@ class DataCollectionThread(QThread):
                         time.sleep(time_to_sleep)
 
     # Update registered windows by sending variable data they need.
-    def update_registered_windows(self, values_read):
+    def update_registered_windows(self, values_read, timestamp):
         if len(self.graph_window_pointers) != 0:
             print("Updating {} graph windows".format(self.graph_window_pointers))
 
             for registered_window in self.graph_window_pointers:
                 print("Calling window: {}".format(registered_window))
                 print(values_read[registered_window])
-                self.graph_window_pointers[registered_window].receive_data(str(values_read[registered_window]))
+                self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
 
     # Simply write data to file and then "Flush" (write data)
     def write_to_file(self, values):
@@ -456,106 +458,23 @@ class GraphWindow(QtWidgets.QDialog):
         self.graphWidget = pg.PlotWidget()
         layout.addWidget(self.graphWidget)
         self.setLayout(layout)
+        self.setWindowTitle("Graphing Variable: {}".format(set_variable))
+        self.graphWidget.setMouseEnabled(x=False, y=False)
 
 
-        self.hour = list(range(100))
-        self.temperature = [0] * 100
+        self.time = list(range(100))
+        self.value = [0] * 100
 
-        # plot data: x, y values
-        # self.data_line =  self.graphWidget.plot(self.x, self.y, pen=pen)
-        self.data_line = self.graphWidget.plot(self.hour, self.temperature)
+        self.data_line = self.graphWidget.plot(self.time, self.value)
 
-
-    def receive_data(self, data):
+    def receive_data(self, data, timestamp):
         print("Got data: {}".format(data))
-        self.temperature.pop(0)
-        self.temperature.append(int(data))
+        self.value.pop(0)
+        self.value.append(int(data))
 
-        self.hour.pop(0)
-        self.hour.append(int(self.hour[-1] + 1))
-        self.data_line.setData(self.hour, self.temperature)
-
-
-# class GraphWindow(QtWidgets.QDialog):
-#     def __init__(self,  window_pointer, set_variable):
-#         super(GraphWindow, self).__init__()
-
-#         self.figure = Figure()
-
-#         # this is the Canvas Widget that displays the `figure`
-#         # it takes the `figure` instance as a parameter to __init__
-#         self.canvas = FigureCanvas(self.figure)
-
-#         # this is the Navigation widget
-#         # it takes the Canvas widget and a parent
-#         # self.toolbar = NavigationToolbar(self.canvas, self)
-
-#         # Just some button connected to `plot` method
-#         # self.button = QtGui.QPushButton('Plot')
-#         # self.button.clicked.connect(self.plot)
-#         self.data_list = [0] * 100
-#         print("THIS IS THE DATA LSIT")
-#         print(self.data_list)
-
-#         # set the layout
-#         layout = QtWidgets.QVBoxLayout()
-#         # layout.addWidget(self.toolbar)
-#         layout.addWidget(self.canvas)
-#         # layout.addWidget(self.button)
-#         self.setLayout(layout)
-
-#     # def plot(self):
-#     def receive_data(self, data):
-
-#         ''' plot some random stuff '''
-#         # random data
-#         # data = [random.random() for i in range(10)]
-#         self.data_list.pop(0)
-#         self.data_list.append(data)
-#         print("DATALIST UPDATED")
-#         print(self.data_list)
-#         # create an axis
-#         ax = self.figure.add_subplot(111)
-
-#         # discards the old graph
-#         ax.clear()
-
-#         # plot data
-#         ax.plot(self.data_list, '*-')
-
-#         # refresh canvas
-#         self.canvas.draw()
-    # def __init__(self,  window_pointer, set_variable):
-
-    #     super(GraphWindow, self).__init__()
-    #     print("Opened window for variable: {}".format(set_variable))
-
-    #     self.layout = QtWidgets.QVBoxLayout()
-
-
-    #     self.graphWidget = pg.PlotWidget()
-    #     self.setWindowTitle("Graphing Variable: {}".format(set_variable))
-
-
-    #     self.windowWidth = 300                       # width of the window displaying the curve
-    #     self.Xm = linspace(0,0,self.windowWidth)          # create array that will contain the relevant time series     
-    #     self.ptr = -self.windowWidth                      # set first x position
-        
-    #     self.layout.addWidget(self.graphWidget)
-    #     self.setLayout(self.layout)
-
-
-    # # This function receives data from the DataCollectionThread
-    # def receive_data(self, data):
-    #     # self.Xm.pop(0)
-    #     # self.Xm.append(data)
-    #     self.Xm[:-1] = self.Xm[1:]                      # shift data in the temporal mean 1 sample left
-    #     self.Xm[-1] = data                 # vector containing the instantaneous values      
-    #     self.ptr += 1                              # update x position for displaying the curve
-    #     self.graphWidget.plot().setData(self.Xm)                     # set the curve with this data
-    #     self.graphWidget.plot().setPos(self.ptr,0)                   # set x position in the graph to 0
-    #     QtGui.QApplication.processEvents()
-
+        self.time.pop(0)
+        self.time.append(int(timestamp))
+        self.data_line.setData(self.time, self.value)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
