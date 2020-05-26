@@ -20,6 +20,11 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
+
+# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+# from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+# from matplotlib.figure import Figure
+
 debug = 1
 
 # Not a mainwindow (Is a dialog), so need to inherit from it
@@ -440,42 +445,116 @@ def generate_random_data():
     return(data_dict)
 
 # Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
-# BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP ALL GUI THREADS
-# https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
-
-
-
+# BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP GUI THREAD
+# https://www.learnpyqt.com/courses/graphics-plotting/plotting-pyqtgraph/
+# https://stackoverflow.com/a/45203110
 class GraphWindow(QtWidgets.QDialog):
     def __init__(self,  window_pointer, set_variable):
-
         super(GraphWindow, self).__init__()
-        print("Opened window for variable: {}".format(set_variable))
-
-        self.layout = QtWidgets.QVBoxLayout()
-
+        layout = QtWidgets.QVBoxLayout()
 
         self.graphWidget = pg.PlotWidget()
-        self.setWindowTitle("Graphing Variable: {}".format(set_variable))
+        layout.addWidget(self.graphWidget)
+        self.setLayout(layout)
 
 
-        self.windowWidth = 300                       # width of the window displaying the curve
-        self.Xm = linspace(0,0,self.windowWidth)          # create array that will contain the relevant time series     
-        self.ptr = -self.windowWidth                      # set first x position
-        
-        self.layout.addWidget(self.graphWidget)
-        self.setLayout(self.layout)
+        self.hour = list(range(100))
+        self.temperature = [0] * 100
+
+        # plot data: x, y values
+        # self.data_line =  self.graphWidget.plot(self.x, self.y, pen=pen)
+        self.data_line = self.graphWidget.plot(self.hour, self.temperature)
 
 
-    # This function receives data from the DataCollectionThread
     def receive_data(self, data):
-        # self.Xm.pop(0)
-        # self.Xm.append(data)
-        self.Xm[:-1] = self.Xm[1:]                      # shift data in the temporal mean 1 sample left
-        self.Xm[-1] = data                 # vector containing the instantaneous values      
-        self.ptr += 1                              # update x position for displaying the curve
-        self.graphWidget.plot().setData(self.Xm)                     # set the curve with this data
-        self.graphWidget.plot().setPos(self.ptr,0)                   # set x position in the graph to 0
-        QtGui.QApplication.processEvents()
+        print("Got data: {}".format(data))
+        self.temperature.pop(0)
+        self.temperature.append(int(data))
+
+        self.hour.pop(0)
+        self.hour.append(int(self.hour[-1] + 1))
+        self.data_line.setData(self.hour, self.temperature)
+
+
+# class GraphWindow(QtWidgets.QDialog):
+#     def __init__(self,  window_pointer, set_variable):
+#         super(GraphWindow, self).__init__()
+
+#         self.figure = Figure()
+
+#         # this is the Canvas Widget that displays the `figure`
+#         # it takes the `figure` instance as a parameter to __init__
+#         self.canvas = FigureCanvas(self.figure)
+
+#         # this is the Navigation widget
+#         # it takes the Canvas widget and a parent
+#         # self.toolbar = NavigationToolbar(self.canvas, self)
+
+#         # Just some button connected to `plot` method
+#         # self.button = QtGui.QPushButton('Plot')
+#         # self.button.clicked.connect(self.plot)
+#         self.data_list = [0] * 100
+#         print("THIS IS THE DATA LSIT")
+#         print(self.data_list)
+
+#         # set the layout
+#         layout = QtWidgets.QVBoxLayout()
+#         # layout.addWidget(self.toolbar)
+#         layout.addWidget(self.canvas)
+#         # layout.addWidget(self.button)
+#         self.setLayout(layout)
+
+#     # def plot(self):
+#     def receive_data(self, data):
+
+#         ''' plot some random stuff '''
+#         # random data
+#         # data = [random.random() for i in range(10)]
+#         self.data_list.pop(0)
+#         self.data_list.append(data)
+#         print("DATALIST UPDATED")
+#         print(self.data_list)
+#         # create an axis
+#         ax = self.figure.add_subplot(111)
+
+#         # discards the old graph
+#         ax.clear()
+
+#         # plot data
+#         ax.plot(self.data_list, '*-')
+
+#         # refresh canvas
+#         self.canvas.draw()
+    # def __init__(self,  window_pointer, set_variable):
+
+    #     super(GraphWindow, self).__init__()
+    #     print("Opened window for variable: {}".format(set_variable))
+
+    #     self.layout = QtWidgets.QVBoxLayout()
+
+
+    #     self.graphWidget = pg.PlotWidget()
+    #     self.setWindowTitle("Graphing Variable: {}".format(set_variable))
+
+
+    #     self.windowWidth = 300                       # width of the window displaying the curve
+    #     self.Xm = linspace(0,0,self.windowWidth)          # create array that will contain the relevant time series     
+    #     self.ptr = -self.windowWidth                      # set first x position
+        
+    #     self.layout.addWidget(self.graphWidget)
+    #     self.setLayout(self.layout)
+
+
+    # # This function receives data from the DataCollectionThread
+    # def receive_data(self, data):
+    #     # self.Xm.pop(0)
+    #     # self.Xm.append(data)
+    #     self.Xm[:-1] = self.Xm[1:]                      # shift data in the temporal mean 1 sample left
+    #     self.Xm[-1] = data                 # vector containing the instantaneous values      
+    #     self.ptr += 1                              # update x position for displaying the curve
+    #     self.graphWidget.plot().setData(self.Xm)                     # set the curve with this data
+    #     self.graphWidget.plot().setPos(self.ptr,0)                   # set x position in the graph to 0
+    #     QtGui.QApplication.processEvents()
 
 
 if __name__ == "__main__":
