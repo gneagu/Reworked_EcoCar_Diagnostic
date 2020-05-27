@@ -15,6 +15,14 @@ from shutil import copy
 from tkinter import filedialog
 import tkinter as tk
 import os
+from pyqtgraph import PlotWidget, plot
+import pyqtgraph as pg
+from numpy import linspace
+
+
+# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+# from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+# from matplotlib.figure import Figure
 
 debug = 1
 
@@ -192,6 +200,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return dict_value_type
 
+    # Enable Events, Debug, and Export button
+    def enable_com_buttons(self):
+        self.ui.events_pushButton_3.setEnabled(True)
+        self.ui.debug_pushButton_6.setEnabled(True)
+        self.ui.export_pushButton_5.setEnabled(True)
+
     # Disable buttons after com port selected (Must restart app to choose different com port)
     def disable_com_selections(self):
         self.ui.set_pushButton_2.setEnabled(False)
@@ -204,6 +218,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Then starts worker thread.
     def set_data_view_variables(self):
         self.disable_com_selections()
+        self.enable_com_buttons()
         # self.connection = self.port_connect()
         self.port_connect()
         self.dict_value_type = self.get_value_name_dict(self.connection)
@@ -318,6 +333,7 @@ class DataCollectionThread(QThread):
                 while True:
                     # Getting time in milliseconds
                     time_start = time.time() * 1000
+                    timestamp = time_start - self.time_stamp_thread_start
 
                     for name, type in self.value_dict.items():
 
@@ -336,7 +352,7 @@ class DataCollectionThread(QThread):
                             print("Error, at reading data")
                             pass
 
-                    self.update_registered_windows(values_read)
+                    self.update_registered_windows(values_read, timestamp)
                     self.new_data_dict.emit(values_read)
 
                     self.write_to_file(values_read)
@@ -354,10 +370,11 @@ class DataCollectionThread(QThread):
                 while True:
                     # Getting time in milliseconds
                     time_start = time.time() * 1000
+                    timestamp = time_start - self.time_stamp_thread_start
 
                     values_read = generate_random_data()
                     self.new_data_dict.emit(values_read)
-                    self.update_registered_windows(values_read)
+                    self.update_registered_windows(values_read, timestamp)
 
                     self.write_to_file(values_read)
 
@@ -371,17 +388,18 @@ class DataCollectionThread(QThread):
 
                     print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
-                    time.sleep(time_to_sleep)
+                    if time_to_sleep > 0:
+                        time.sleep(time_to_sleep)
 
     # Update registered windows by sending variable data they need.
-    def update_registered_windows(self, values_read):
+    def update_registered_windows(self, values_read, timestamp):
         if len(self.graph_window_pointers) != 0:
             print("Updating {} graph windows".format(self.graph_window_pointers))
 
             for registered_window in self.graph_window_pointers:
                 print("Calling window: {}".format(registered_window))
                 print(values_read[registered_window])
-                self.graph_window_pointers[registered_window].receive_data("{} {}".format(registered_window, values_read[registered_window]))
+                self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
 
     # Simply write data to file and then "Flush" (write data)
     def write_to_file(self, values):
@@ -397,12 +415,15 @@ class DataCollectionThread(QThread):
     # Open a dialog to determine save location, and then copy file from the temp location.
     def save_data_file(self, parent_window):
         destination_location = str(QtWidgets.QFileDialog.getSaveFileName(parent_window, "Select Directory", self.file_name)[0])
-        print(destination_location)
 
-        source_location = './temp/{}'.format(self.file_name)
-        print("Save location: {}".format(source_location))
-
-        copy(source_location, destination_location)
+        # User can click cancel which leaves desination_location empty
+        if destination_location != '':
+            source_location = './temp/{}'.format(self.file_name)
+            print("Save location: {}".format(destination_location))
+            try:
+                copy(source_location, destination_location)
+            except:
+                print("Could not copy file.")
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
@@ -435,28 +456,34 @@ def generate_random_data():
     return(data_dict)
 
 # Make another worker here for the graph screen. Can connect the the function that gets coms data to multiple functions. 
-# BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP ALL GUI THREADS
-# https://stackoverflow.com/questions/10653704/pyqt-connect-signal-to-multiple-slot
+# BE CAREFUL NOT TO DO ANY WORK IN THIS THREAD (Updates are okay), OTHERWISE IT LOCKS UP GUI THREAD
+# https://www.learnpyqt.com/courses/graphics-plotting/plotting-pyqtgraph/
+# https://stackoverflow.com/a/45203110
 class GraphWindow(QtWidgets.QDialog):
     def __init__(self,  window_pointer, set_variable):
-
         super(GraphWindow, self).__init__()
-        self.textt = "click me"
-        print("Opened window for variable: {}".format(set_variable))
+        layout = QtWidgets.QVBoxLayout()
+        self.graphWidget = pg.PlotWidget()
+        layout.addWidget(self.graphWidget)
+        self.setLayout(layout)
+        self.graphWidget.setConfigOption('leftButtonPan', False)
 
-        self.layout = QtWidgets.QVBoxLayout()
         self.setWindowTitle("Graphing Variable: {}".format(set_variable))
+        self.graphWidget.setMouseEnabled(x=False, y=False)
 
-        self.pushDisButton = QtWidgets.QPushButton("trial")
-        self.resize(630, 150)
-        self.layout.addWidget(self.pushDisButton)
-        self.setLayout(self.layout)
+        self.time = list(range(100))
+        self.value = [0] * 100
 
-    # This function receives data from the DataCollectionThread
-    def receive_data(self, data):
-        print("Window {} got data".format(data))
-        self.pushDisButton.setText(str(data))
+        self.data_line = self.graphWidget.plot(self.time, self.value)
 
+    def receive_data(self, data, timestamp):
+        print("Got data: {}".format(data))
+        self.value.pop(0)
+        self.value.append(int(data))
+
+        self.time.pop(0)
+        self.time.append(int(timestamp))
+        self.data_line.setData(self.time, self.value)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

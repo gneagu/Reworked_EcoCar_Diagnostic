@@ -107,6 +107,10 @@ class Ui_Dialog(object):
         self.label_5 = QtWidgets.QLabel(Dialog)
         self.label_5.setGeometry(QtCore.QRect(24, 120, 55, 16))
         self.label_5.setObjectName(_fromUtf8("label_5"))
+        self.events_pushButton_3.setEnabled(False)
+        self.debug_pushButton_6.setEnabled(False)
+        self.export_pushButton_5.setEnabled(False)
+
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
