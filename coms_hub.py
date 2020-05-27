@@ -4,7 +4,7 @@ import time
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
-from gui import mainUI3, trial
+from gui import mainUI4, trial
 import random
 from functools import partial
 import csv
@@ -36,7 +36,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.numOfVars = 0
         self.buttons = []
         self.connection = 0
-        self.ui = mainUI3.Ui_Dialog()
+        self.ui = mainUI4.Ui_Dialog()
         self.ui.setupUi(self)
         self.dialog = EventWindow(self)
         self.dict_value_type = {}
