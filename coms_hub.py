@@ -19,11 +19,6 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
-
-# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-# from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
-# from matplotlib.figure import Figure
-
 debug = 1
 
 # Not a mainwindow (Is a dialog), so need to inherit from it
@@ -90,8 +85,6 @@ class MainWindow(QtWidgets.QMainWindow):
     # Need to send context of widget to the function in the DatCollectionThread
     def open_file_save_dialog(self):
         self.thread.save_data_file(self)
-
-
 
     # Remove rows and columns. (Needs to be reversed since removing column at start
     # remaps proceeding)
@@ -229,6 +222,7 @@ class MainWindow(QtWidgets.QMainWindow):
         #Launch seperate thread to get variable from coms hub.
         self.thread = DataCollectionThread()
         self.thread.new_data_dict.connect(self.update_data_view)
+
         # https://stackoverflow.com/questions/45668961/send-data-to-qthread-when-in-have-changes-in-gui-windows-pyqt5
         self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
         self.thread.start()
@@ -299,6 +293,7 @@ class DataCollectionThread(QThread):
         self.value_dict = dict_value_names
         self.time_delay = time_delay
 
+    # Update delay. Called when delay spinbox changed.
     def change_delay(self, new_time_delay):
         print("Delay has been changed to: {}".format(new_time_delay))
         self.time_delay = new_time_delay
@@ -445,7 +440,7 @@ class DataCollectionThread(QThread):
         except:
             print("Could not remove file from temp folder")
 
-
+# Generate random data so I don't have to connect Com Hub
 def generate_random_data():
     values = ['data1','data2','data3','data4','data5','data6']
     data_dict = {}
@@ -476,6 +471,8 @@ class GraphWindow(QtWidgets.QDialog):
 
         self.data_line = self.graphWidget.plot(self.time, self.value)
 
+    # Simple update is okay as it doesn't impact performance.
+    # Very quick, so wont block GUI from responding.
     def receive_data(self, data, timestamp):
         print("Got data: {}".format(data))
         self.value.pop(0)
