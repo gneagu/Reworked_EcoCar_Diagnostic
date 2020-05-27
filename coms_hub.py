@@ -15,7 +15,6 @@ from shutil import copy
 from tkinter import filedialog
 import tkinter as tk
 import os
-
 from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
@@ -201,6 +200,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return dict_value_type
 
+    # Enable Events, Debug, and Export button
+    def enable_com_buttons(self):
+        self.ui.events_pushButton_3.setEnabled(True)
+        self.ui.debug_pushButton_6.setEnabled(True)
+        self.ui.export_pushButton_5.setEnabled(True)
+
     # Disable buttons after com port selected (Must restart app to choose different com port)
     def disable_com_selections(self):
         self.ui.set_pushButton_2.setEnabled(False)
@@ -213,6 +218,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Then starts worker thread.
     def set_data_view_variables(self):
         self.disable_com_selections()
+        self.enable_com_buttons()
         # self.connection = self.port_connect()
         self.port_connect()
         self.dict_value_type = self.get_value_name_dict(self.connection)
@@ -409,12 +415,15 @@ class DataCollectionThread(QThread):
     # Open a dialog to determine save location, and then copy file from the temp location.
     def save_data_file(self, parent_window):
         destination_location = str(QtWidgets.QFileDialog.getSaveFileName(parent_window, "Select Directory", self.file_name)[0])
-        print(destination_location)
 
-        source_location = './temp/{}'.format(self.file_name)
-        print("Save location: {}".format(source_location))
-
-        copy(source_location, destination_location)
+        # User can click cancel which leaves desination_location empty
+        if destination_location != '':
+            source_location = './temp/{}'.format(self.file_name)
+            print("Save location: {}".format(destination_location))
+            try:
+                copy(source_location, destination_location)
+            except:
+                print("Could not copy file.")
 
     # Function to kill a thread
     # https://stackoverflow.com/questions/51135444/how-to-kill-a-running-thread
@@ -454,13 +463,13 @@ class GraphWindow(QtWidgets.QDialog):
     def __init__(self,  window_pointer, set_variable):
         super(GraphWindow, self).__init__()
         layout = QtWidgets.QVBoxLayout()
-
         self.graphWidget = pg.PlotWidget()
         layout.addWidget(self.graphWidget)
         self.setLayout(layout)
+        self.graphWidget.setConfigOption('leftButtonPan', False)
+
         self.setWindowTitle("Graphing Variable: {}".format(set_variable))
         self.graphWidget.setMouseEnabled(x=False, y=False)
-
 
         self.time = list(range(100))
         self.value = [0] * 100
