@@ -46,7 +46,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
-        self.ui.version_pushButton_4.clicked.connect(self.show_trial_screen)
+        self.ui.version_pushButton_4.clicked.connect(self.open_version_window)
         self.ui.export_pushButton_5.clicked.connect(self.open_file_save_dialog)
 
         # This searches active com ports, and adds them to the comboBox
@@ -56,6 +56,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thread.register()
 
         self.dialog.show()
+
+    # Simple function. Bind window to a variable, else garbage collection gets it
+    def open_version_window(self):
+        self.new_window = VersionWindow()
+        self.new_window.show()
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -481,6 +486,18 @@ class GraphWindow(QtWidgets.QDialog):
         self.time.pop(0)
         self.time.append(int(timestamp))
         self.data_line.setData(self.time, self.value)
+
+# Simple little window to show some information
+class VersionWindow(QtWidgets.QDialog):
+    def __init__(self):
+        super(VersionWindow, self).__init__()
+        self.layout = QtWidgets.QVBoxLayout()
+
+        self.version_label = QtWidgets.QLabel("Version: 0.01")
+        self.layout.addWidget(self.version_label)
+
+        self.setWindowTitle("Version")
+        self.setLayout(self.layout)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
