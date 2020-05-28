@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '.\mainUI4.ui'
+# Form implementation generated from reading ui file '.\mainUIFinal.ui'
 #
 # Created by: PyQt5 UI code generator 5.14.2
 #
@@ -41,6 +41,13 @@ class Ui_Dialog(object):
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.com_port_comboBox = QtWidgets.QComboBox(self.frame)
+        self.com_port_comboBox.setEnabled(True)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.com_port_comboBox.sizePolicy().hasHeightForWidth())
+        self.com_port_comboBox.setSizePolicy(sizePolicy)
+        self.com_port_comboBox.setMinimumSize(QtCore.QSize(100, 0))
         self.com_port_comboBox.setObjectName("com_port_comboBox")
         self.horizontalLayout_2.addWidget(self.com_port_comboBox)
         spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -49,8 +56,8 @@ class Ui_Dialog(object):
         self.refresh_pushButton.setObjectName("refresh_pushButton")
         self.horizontalLayout_2.addWidget(self.refresh_pushButton)
         self.verticalLayout.addLayout(self.horizontalLayout_2)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.horizontalLayout_7 = QtWidgets.QHBoxLayout()
+        self.horizontalLayout_7.setObjectName("horizontalLayout_7")
         self.baud_rate_lineEdit = QtWidgets.QLineEdit(self.frame)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
@@ -61,19 +68,19 @@ class Ui_Dialog(object):
         self.baud_rate_lineEdit.setInputMask("")
         self.baud_rate_lineEdit.setMaxLength(6)
         self.baud_rate_lineEdit.setObjectName("baud_rate_lineEdit")
-        self.horizontalLayout.addWidget(self.baud_rate_lineEdit)
+        self.horizontalLayout_7.addWidget(self.baud_rate_lineEdit)
         self.label = QtWidgets.QLabel(self.frame)
         self.label.setObjectName("label")
-        self.horizontalLayout.addWidget(self.label)
+        self.horizontalLayout_7.addWidget(self.label)
         self.direct_checkBox = QtWidgets.QCheckBox(self.frame)
         self.direct_checkBox.setObjectName("direct_checkBox")
-        self.horizontalLayout.addWidget(self.direct_checkBox)
+        self.horizontalLayout_7.addWidget(self.direct_checkBox)
         spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout.addItem(spacerItem1)
+        self.horizontalLayout_7.addItem(spacerItem1)
         self.set_pushButton_2 = QtWidgets.QPushButton(self.frame)
         self.set_pushButton_2.setObjectName("set_pushButton_2")
-        self.horizontalLayout.addWidget(self.set_pushButton_2)
-        self.verticalLayout.addLayout(self.horizontalLayout)
+        self.horizontalLayout_7.addWidget(self.set_pushButton_2)
+        self.verticalLayout.addLayout(self.horizontalLayout_7)
         self.verticalLayout_4.addWidget(self.frame)
         self.label_5 = QtWidgets.QLabel(Dialog)
         self.label_5.setObjectName("label_5")

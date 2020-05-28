@@ -4,7 +4,7 @@ import time
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
-from gui import mainUI4, trial
+from gui import mainUI_v6, trial
 import random
 from functools import partial
 import csv
@@ -29,19 +29,20 @@ class EventWindow(QtWidgets.QDialog):
         self.ui2 = trial.Ui_Dialog()
         self.ui2.setupUi(self)
 
-class MainWindow(QtWidgets.QMainWindow):
+class MainWindow(QtWidgets.QDialog):
 
     def __init__(self):
         super(MainWindow, self).__init__()
         self.numOfVars = 0
         self.buttons = []
         self.connection = 0
-        self.ui = mainUI4.Ui_Dialog()
+        self.ui = mainUI_v6.Ui_Dialog()
         self.ui.setupUi(self)
         self.dialog = EventWindow(self)
         self.dict_value_type = {}
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
+        self.thread = 0
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -64,8 +65,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
-        # do stuff
-        self.thread.killthread()
+        # Close thread if it was opened (avoid error)
+        if self.thread:
+            self.thread.killthread()
         event.accept() # let the window close
 
     # Taking user selection, opens a conenction on specified port.
@@ -466,7 +468,7 @@ class GraphWindow(QtWidgets.QDialog):
         self.graphWidget = pg.PlotWidget()
         layout.addWidget(self.graphWidget)
         self.setLayout(layout)
-        self.graphWidget.setConfigOption('leftButtonPan', False)
+        # self.graphWidget.setConfigOption('leftButtonPan', False)
 
         self.setWindowTitle("Graphing Variable: {}".format(set_variable))
         self.graphWidget.setMouseEnabled(x=False, y=False)

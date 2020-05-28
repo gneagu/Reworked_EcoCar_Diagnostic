@@ -17,7 +17,7 @@
    </sizepolicy>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>EcoCar Diagnostics</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_4">
    <item>
@@ -51,7 +51,23 @@
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout_2">
         <item>
-         <widget class="QComboBox" name="com_port_comboBox"/>
+         <widget class="QComboBox" name="com_port_comboBox">
+          <property name="enabled">
+           <bool>true</bool>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>100</width>
+            <height>0</height>
+           </size>
+          </property>
+         </widget>
         </item>
         <item>
          <spacer name="horizontalSpacer_3">
@@ -212,6 +228,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="events_pushButton_3">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="text">
              <string>Events</string>
             </property>
@@ -240,6 +259,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="debug_pushButton_6">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="text">
              <string>Debug</string>
             </property>
@@ -260,6 +282,9 @@
           </item>
           <item>
            <widget class="QPushButton" name="export_pushButton_5">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
             <property name="text">
              <string>Export</string>
             </property>
