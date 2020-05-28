@@ -495,7 +495,7 @@ class VersionWindow(QtWidgets.QDialog):
         super(VersionWindow, self).__init__()
         self.layout = QtWidgets.QVBoxLayout()
 
-        self.version_label = QtWidgets.QLabel("Version: 0.01")
+        self.version_label = QtWidgets.QLabel("Version: 0.02")
         self.layout.addWidget(self.version_label)
 
         self.setWindowTitle("Version")
