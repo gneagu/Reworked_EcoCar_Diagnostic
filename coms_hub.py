@@ -4,7 +4,7 @@ import time
 import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
-from gui import mainUI_v6, trial
+from gui import mainUI_v6
 import random
 from functools import partial
 import csv
@@ -21,14 +21,6 @@ from numpy import linspace
 
 debug = 1
 
-# Not a mainwindow (Is a dialog), so need to inherit from it
-# https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
-class EventWindow(QtWidgets.QDialog):
-    def __init__(self, parent=None):
-        super(EventWindow, self).__init__(parent)
-        self.ui2 = trial.Ui_Dialog()
-        self.ui2.setupUi(self)
-
 class MainWindow(QtWidgets.QDialog):
 
     def __init__(self):
@@ -38,7 +30,6 @@ class MainWindow(QtWidgets.QDialog):
         self.connection = 0
         self.ui = mainUI_v6.Ui_Dialog()
         self.ui.setupUi(self)
-        self.dialog = EventWindow(self)
         self.dict_value_type = {}
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
@@ -312,6 +303,11 @@ class DataCollectionThread(QThread):
         if variable not in self.graph_window_pointers:
             self.graph_window_pointers[variable] = window
 
+    # Remove a window from list of windows to be updated.
+    # Once reference to window is gone, garbage collection can get it.
+    def unregister(self, variable):
+        self.graph_window_pointers.pop(variable)
+
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
     def run(self):
@@ -462,15 +458,17 @@ def generate_random_data():
 # https://www.learnpyqt.com/courses/graphics-plotting/plotting-pyqtgraph/
 # https://stackoverflow.com/a/45203110
 class GraphWindow(QtWidgets.QDialog):
-    def __init__(self,  window_pointer, set_variable):
+    def __init__(self,  parent_pointer, set_variable):
         super(GraphWindow, self).__init__()
         layout = QtWidgets.QVBoxLayout()
         self.graphWidget = pg.PlotWidget()
         layout.addWidget(self.graphWidget)
         self.setLayout(layout)
+        self.dct_pointer = parent_pointer
+        self.title = set_variable
         # self.graphWidget.setConfigOption('leftButtonPan', False)
 
-        self.setWindowTitle("Graphing Variable: {}".format(set_variable))
+        self.setWindowTitle("Graphing Variable: {}".format(self.title))
         self.graphWidget.setMouseEnabled(x=False, y=False)
 
         self.time = list(range(100))
@@ -488,6 +486,12 @@ class GraphWindow(QtWidgets.QDialog):
         self.time.pop(0)
         self.time.append(int(timestamp))
         self.data_line.setData(self.time, self.value)
+
+    # Overriding closeEvent, so I can unregister window from DataCollectionThread
+    # https://stackoverflow.com/a/12366684
+    def closeEvent(self, evnt):
+        self.dct_pointer.unregister(self.title)
+        super(GraphWindow, self).closeEvent(evnt)
 
 # Simple little window to show some information
 class VersionWindow(QtWidgets.QDialog):
