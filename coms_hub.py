@@ -465,8 +465,7 @@ class GraphWindow(QtWidgets.QDialog):
         layout.addWidget(self.graphWidget)
         self.setLayout(layout)
         self.dct_pointer = parent_pointer
-        self.title = set_variable
-        # self.graphWidget.setConfigOption('leftButtonPan', False)
+        self.title = set_variable # Need to keep the variable name so I can unregister from DCT
 
         self.setWindowTitle("Graphing Variable: {}".format(self.title))
         self.graphWidget.setMouseEnabled(x=False, y=False)
