@@ -17,7 +17,7 @@ class TestWindow(QtWidgets.QDialog):
         self.table.setCellWidget(0, 0, self.tableItem )
         # Connect signal which is emmited when done editing qlineedit box
         self.tableItem.textEdited.connect(self.doNot)
-        self.tableItem.focusOutEvent = self.change
+        self.tableItem.focusInEvent = self.change
 
         self.tableItem.copyAvailable = self.available
 
@@ -29,13 +29,13 @@ class TestWindow(QtWidgets.QDialog):
 
 
     # self.text_box.installEventFilter(self)
-    # ...
+    # https://stackoverflow.com/a/57698918
         self.tableItem.installEventFilter(self)
     def eventFilter(self, obj, event):
     	# print("eventFilter")
     	if event.type() == QtCore.QEvent.KeyPress and obj is self.tableItem:
     		print("TYPE")
-    		if event.key() == QtCore.Qt.Key_Return and self.text_box.hasFocus():
+    		if event.key() == QtCore.Qt.Key_Return and self.tableItem.hasFocus():
     			print('Enter pressed')
     			return True
 
@@ -66,7 +66,10 @@ class TestWindow(QtWidgets.QDialog):
         self.thread.start()
 
     def update_data_view(self, data):
-    	self.tableItem.setText(str(data))
+    	if not self.tableItem.hasFocus():
+	    	self.tableItem.setText(str(data))
+
+    	print("The box is being clicked: {}".format(self.tableItem.hasFocus()))
 
 
 class DataCollectionThread(QThread):
