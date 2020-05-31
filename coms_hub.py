@@ -27,6 +27,7 @@ class MainWindow(QtWidgets.QDialog):
         super(MainWindow, self).__init__()
         self.numOfVars = 0
         self.buttons = []
+        self.textedits = {} # Dict because I can't set a tooltip on a textedit
         self.connection = 0
         self.ui = mainUI_v6.Ui_Dialog()
         self.ui.setupUi(self)
@@ -115,17 +116,42 @@ class MainWindow(QtWidgets.QDialog):
         # for i in range(int(self.numOfVars)):
             self.ui.tableWidget.insertRow(i)
 
-            #Create Button to push to tableWidget
+            # Create Button to push to tableWidget
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
             # self.buttons[i].setToolTip(str(name))
             self.buttons[i].setToolTip(name)
 
-            #Set cell as button
+            # Create textedit, and link to variable
+            new_text_edit = QtWidgets.QLineEdit()
+            self.textedits[name] = new_text_edit
+
+            # Connecting custom event filter (press enter) so I know when to send new data to the coms hub
+            self.textedits[name].installEventFilter(self)
+
+
+            self.ui.tableWidget.setCellWidget(i, 1, self.textedits[name])
+
+            # Set cell as button
             self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
             self.buttons[i].clicked.connect(partial(self.on_pushButton_clicked, self.buttons[i]))
 
             i = i + 1
+
+
+    # https://stackoverflow.com/a/57698918
+    # Custom event filter to know when to send data to coms.
+    # When activated, calls function in worker thread to add data to stack (send when available)
+    def eventFilter(self, obj, event):
+        # print("eventFilter")
+        if event.type() == QtCore.QEvent.KeyPress and obj in self.textedits:
+            print("TYPE")
+            # if event.key() == QtCore.Qt.Key_Return and self.tableItem.hasFocus():
+            #     print('Enter pressed')
+            #     # TODO: Call here DCT
+            #     return True
+
+        return False
 
     # https://stackoverflow.com/questions/36823841/pyqt-getting-which-button-called-a-specific-function
     # Each graph button in tablewidget has the tooltip set as corresponding variable name.
@@ -257,10 +283,19 @@ class MainWindow(QtWidgets.QDialog):
     # This function updates the values in the main window.
     def update_data_view(self, data):
         i = 0
+        data.pop('Timestamp') # Timestamp data point added to data, so need to pop it.
 
         for (name, value) in data.items():
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
-            self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
+            # Check if textedit is being modified before updating it.
+            # print(self.textedits)
+
+            # self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
+
+            # print(data)
+            if not self.textedits[name].hasFocus():           
+                # self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
+                self.textedits[name].setText(str(data[name]))
             i = i + 1
 
         print("Updating Data in Widget:")

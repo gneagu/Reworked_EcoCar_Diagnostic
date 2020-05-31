@@ -16,15 +16,17 @@ class TestWindow(QtWidgets.QDialog):
         self.tableItem.setText( "Testing" )
         self.table.setCellWidget(0, 0, self.tableItem )
         # Connect signal which is emmited when done editing qlineedit box
-        self.tableItem.textEdited.connect(self.doNot)
-        self.tableItem.focusInEvent = self.change
 
-        self.tableItem.copyAvailable = self.available
+        
+        # self.tableItem.textEdited.connect(self.doNot)
+        # self.tableItem.focusInEvent = self.change
+
+        # self.tableItem.copyAvailable = self.available
 
         layout.addWidget(self.table)
 
-        self.comboBox = QtWidgets.QComboBox()
-        self.table.setCellWidget(1,1, self.comboBox)
+        # self.comboBox = QtWidgets.QComboBox()
+        # self.table.setCellWidget(1,1, self.comboBox)
         self.doSomething()
 
 
@@ -42,16 +44,16 @@ class TestWindow(QtWidgets.QDialog):
     	return False
         # return False
 
-    def available(self, value):
-    	print("Has been selected")
-    	print(value)
+    # def available(self, value):
+    # 	print("Has been selected")
+    # 	print(value)
 
 
-    def doNot(self):
-    	print("Updated text")
+    # def doNot(self):
+    # 	print("Updated text")
 
-    def change(self, extra):
-    	print("CHANGED SELCTION")
+    # def change(self, extra):
+    # 	print("CHANGED SELCTION")
 
 
     def doSomething(self):
