@@ -144,10 +144,13 @@ class MainWindow(QtWidgets.QDialog):
     # When activated, calls function in worker thread to add data to stack (send when available)
     def eventFilter(self, obj, event):
         # print("eventFilter")
-        if event.type() == QtCore.QEvent.KeyPress and obj in self.textedits:
+        # print(obj)
+        # print(self.textedits.values())
+        # print(obj in self.textedits)
+        if event.type() == QtCore.QEvent.KeyPress and obj in self.textedits.values():
             print("TYPE")
-            # if event.key() == QtCore.Qt.Key_Return and self.tableItem.hasFocus():
-            #     print('Enter pressed')
+            if event.key() == QtCore.Qt.Key_Return and obj.hasFocus():
+                print('Enter pressed')
             #     # TODO: Call here DCT
             #     return True
 
