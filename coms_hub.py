@@ -27,6 +27,7 @@ class MainWindow(QtWidgets.QDialog):
         super(MainWindow, self).__init__()
         self.numOfVars = 0
         self.buttons = []
+        self.textedits = {} # Dict because I can't set a tooltip on a textedit
         self.connection = 0
         self.ui = mainUI_v6.Ui_Dialog()
         self.ui.setupUi(self)
@@ -46,7 +47,6 @@ class MainWindow(QtWidgets.QDialog):
 
     def show_trial_screen(self):
         self.thread.register()
-
         self.dialog.show()
 
     # Simple function. Bind window to a variable, else garbage collection gets it
@@ -66,7 +66,6 @@ class MainWindow(QtWidgets.QDialog):
         self.time_delay = self.ui.time_spinBox.value()
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
-
 
         if debug == 0:
 
@@ -115,17 +114,42 @@ class MainWindow(QtWidgets.QDialog):
         # for i in range(int(self.numOfVars)):
             self.ui.tableWidget.insertRow(i)
 
-            #Create Button to push to tableWidget
+            # Create Button to push to tableWidget
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
             # self.buttons[i].setToolTip(str(name))
             self.buttons[i].setToolTip(name)
 
-            #Set cell as button
+            # Create textedit, and link to variable
+            new_text_edit = QtWidgets.QLineEdit()
+            self.textedits[name] = new_text_edit
+
+            # Connecting custom event filter (press enter) so I know when to send new data to the coms hub
+            self.textedits[name].installEventFilter(self)
+            self.ui.tableWidget.setCellWidget(i, 1, self.textedits[name])
+
+            # Set cell as button
             self.ui.tableWidget.setCellWidget(i, 2, self.buttons[i])
             self.buttons[i].clicked.connect(partial(self.on_pushButton_clicked, self.buttons[i]))
 
             i = i + 1
+
+
+    # https://stackoverflow.com/a/57698918
+    # Custom event filter to know when to send data to coms.
+    # When activated, calls function in worker thread to add data to stack (send when available)
+    def eventFilter(self, obj, event):
+        if event.type() == QtCore.QEvent.KeyPress and obj in self.textedits.values():
+            print("TYPE")
+            if event.key() == QtCore.Qt.Key_Return and obj.hasFocus():
+                print('Enter pressed')
+
+                # TODO: Beautify with a lambda statment
+                value = [key for key,value in self.textedits.items() if value == obj]
+                self.thread.add_to_stack('SET', value[0], obj.text())
+                return True
+
+        return False
 
     # https://stackoverflow.com/questions/36823841/pyqt-getting-which-button-called-a-specific-function
     # Each graph button in tablewidget has the tooltip set as corresponding variable name.
@@ -257,10 +281,15 @@ class MainWindow(QtWidgets.QDialog):
     # This function updates the values in the main window.
     def update_data_view(self, data):
         i = 0
+        data.pop('Timestamp') # Timestamp data point added to data, so need to pop it.
 
         for (name, value) in data.items():
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
-            self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
+  
+            # Check if textedit is being modified before updating it.
+            if not self.textedits[name].hasFocus():           
+                self.textedits[name].setText(str(data[name]))
+    
             i = i + 1
 
         print("Updating Data in Widget:")
@@ -285,6 +314,7 @@ class DataCollectionThread(QThread):
         self.connection = 0
         self.value_dict = {}
         self.graph_window_pointers = {}
+        self.stack = []
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -307,6 +337,12 @@ class DataCollectionThread(QThread):
     # Once reference to window is gone, garbage collection can get it.
     def unregister(self, variable):
         self.graph_window_pointers.pop(variable)
+
+    # Need to be able to send values to the coms_hub. 
+    # Creating stack as functions can send data, and only coms hub has access to write to connection
+    def add_to_stack(self, command, variable, value):
+        self.stack.append((command, variable, value))
+        print(self.stack)
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -355,6 +391,9 @@ class DataCollectionThread(QThread):
 
                     self.write_to_file(values_read)
 
+                    #TODO: Send out data from the stack
+                    self.empty_stack()
+
                     # Getting time in milliseconds
                     time_end = time.time() * 1000
 
@@ -376,13 +415,15 @@ class DataCollectionThread(QThread):
 
                     self.write_to_file(values_read)
 
+                    #TODO: Send out data from the stack
+                    self.empty_stack()
+
                     # Getting time in milliseconds
                     time_end = time.time() * 1000
 
                     # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
                     # last, and not just y milliseconds work + x milliseconds delay
                     time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
 
                     print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
@@ -398,6 +439,17 @@ class DataCollectionThread(QThread):
                 print("Calling window: {}".format(registered_window))
                 print(values_read[registered_window])
                 self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
+
+
+    def empty_stack(self):
+        if len(self.stack) > 0:
+            # Empty stack
+            for (command, variable_name, value) in self.stack:
+                to_send = "{} {} {}\n".format(command, variable_name, value)
+                print("Command sent to coms_hub: {}".format(to_send))
+                if debug == 0:
+                    self.connection.write(to_send.encode(encoding='ascii'))
+                self.stack.pop(0)
 
     # Simply write data to file and then "Flush" (write data)
     def write_to_file(self, values):
