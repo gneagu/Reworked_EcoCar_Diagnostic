@@ -47,7 +47,6 @@ class MainWindow(QtWidgets.QDialog):
 
     def show_trial_screen(self):
         self.thread.register()
-
         self.dialog.show()
 
     # Simple function. Bind window to a variable, else garbage collection gets it
@@ -67,7 +66,6 @@ class MainWindow(QtWidgets.QDialog):
         self.time_delay = self.ui.time_spinBox.value()
         COM_port = self.ui.com_port_comboBox.currentText()
         baud_rate = self.ui.baud_rate_lineEdit.text()
-
 
         if debug == 0:
 
@@ -128,8 +126,6 @@ class MainWindow(QtWidgets.QDialog):
 
             # Connecting custom event filter (press enter) so I know when to send new data to the coms hub
             self.textedits[name].installEventFilter(self)
-
-
             self.ui.tableWidget.setCellWidget(i, 1, self.textedits[name])
 
             # Set cell as button
@@ -143,10 +139,6 @@ class MainWindow(QtWidgets.QDialog):
     # Custom event filter to know when to send data to coms.
     # When activated, calls function in worker thread to add data to stack (send when available)
     def eventFilter(self, obj, event):
-        # print("eventFilter")
-        # print(obj)
-        # print(self.textedits.values())
-        # print(obj in self.textedits)
         if event.type() == QtCore.QEvent.KeyPress and obj in self.textedits.values():
             print("TYPE")
             if event.key() == QtCore.Qt.Key_Return and obj.hasFocus():
@@ -293,15 +285,11 @@ class MainWindow(QtWidgets.QDialog):
 
         for (name, value) in data.items():
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
+  
             # Check if textedit is being modified before updating it.
-            # print(self.textedits)
-
-            # self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
-
-            # print(data)
             if not self.textedits[name].hasFocus():           
-                # self.ui.tableWidget.setItem(i, 1,QtWidgets.QTableWidgetItem(str(value).replace('\n','')))
                 self.textedits[name].setText(str(data[name]))
+    
             i = i + 1
 
         print("Updating Data in Widget:")
