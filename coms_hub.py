@@ -391,6 +391,9 @@ class DataCollectionThread(QThread):
 
                     self.write_to_file(values_read)
 
+                    #TODO: Send out data from the stack
+                    self.empty_stack()
+
                     # Getting time in milliseconds
                     time_end = time.time() * 1000
 
@@ -412,13 +415,15 @@ class DataCollectionThread(QThread):
 
                     self.write_to_file(values_read)
 
+                    #TODO: Send out data from the stack
+                    self.empty_stack()
+
                     # Getting time in milliseconds
                     time_end = time.time() * 1000
 
                     # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
                     # last, and not just y milliseconds work + x milliseconds delay
                     time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
 
                     print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
@@ -434,6 +439,17 @@ class DataCollectionThread(QThread):
                 print("Calling window: {}".format(registered_window))
                 print(values_read[registered_window])
                 self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
+
+
+    def empty_stack(self):
+        if len(self.stack) > 0:
+            # Empty stack
+            for (command, variable_name, value) in self.stack:
+                to_send = "{} {} {}\n".format(command, variable_name, value)
+                print("Command sent to coms_hub: {}".format(to_send))
+                if debug == 0:
+                    self.connection.write(to_send.encode(encoding='ascii'))
+                self.stack.pop(0)
 
     # Simply write data to file and then "Flush" (write data)
     def write_to_file(self, values):
