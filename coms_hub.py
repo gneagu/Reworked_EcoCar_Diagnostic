@@ -151,8 +151,11 @@ class MainWindow(QtWidgets.QDialog):
             print("TYPE")
             if event.key() == QtCore.Qt.Key_Return and obj.hasFocus():
                 print('Enter pressed')
-            #     # TODO: Call here DCT
-            #     return True
+
+                # TODO: Beautify with a lambda statment
+                value = [key for key,value in self.textedits.items() if value == obj]
+                self.thread.add_to_stack('SET', value[0], obj.text())
+                return True
 
         return False
 
@@ -323,6 +326,7 @@ class DataCollectionThread(QThread):
         self.connection = 0
         self.value_dict = {}
         self.graph_window_pointers = {}
+        self.stack = []
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -345,6 +349,12 @@ class DataCollectionThread(QThread):
     # Once reference to window is gone, garbage collection can get it.
     def unregister(self, variable):
         self.graph_window_pointers.pop(variable)
+
+    # Need to be able to send values to the coms_hub. 
+    # Creating stack as functions can send data, and only coms hub has access to write to connection
+    def add_to_stack(self, command, variable, value):
+        self.stack.append((command, variable, value))
+        print(self.stack)
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
