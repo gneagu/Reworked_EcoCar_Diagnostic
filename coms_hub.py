@@ -216,7 +216,6 @@ class MainWindow(QtWidgets.QDialog):
                 ser.write(bitString.encode(encoding='ascii'))
                 time.sleep(0.1)
 
-
                 # Value list returns as ["command sent", "variable type", "variable name"]
                 # Variable name and type returned Ex//
                 valueList = ser.readline().decode(encoding='ascii').split(" ")
@@ -361,10 +360,13 @@ class DataCollectionThread(QThread):
 
     # Register debug window so it can be updated when open.
     def register_debugger(self, variable):
+        print("Registered debugger window.")
+        print(variable)
         self.debugger = variable
 
     # Unregister debug window so can stop updating it.
     def unregister_debugger(self):
+        print("Unregistered debugger window.")
         self.debugger = 0
 
     # Need to be able to send values to the coms_hub. 
@@ -405,14 +407,16 @@ class DataCollectionThread(QThread):
                         self.connection.write(bitString.encode(encoding='ascii'))
 
                         # Update debug window we know what command was sent.
-                        self.debugger.listView.addItem(bitString.replace("\n",''))
-
-                        # Update debug window so we know what info was received.
-
+                        self.update_debugger(bitString.replace("\n",''))
 
                         try:
                             # Read value from Coms hub
-                            value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
+                            received = self.connection.readline().decode(encoding='ascii')
+                            value = received.split(" ")[-1]
+                            
+                            # Update debug window so we know what info was received.
+                            self.update_debugger(received.replace("\n",''))
+
                             if type == 'F':
                                 values_read[name] = float(value)
                             else:
@@ -450,7 +454,10 @@ class DataCollectionThread(QThread):
 
                     self.write_to_file(values_read)
 
-                    #TODO: Send out data from the stack
+                    # Update debugger window
+                    self.update_debugger("Got fake data.")
+
+                    #Send out data from the stack
                     self.empty_stack()
 
                     # Getting time in milliseconds
@@ -464,6 +471,16 @@ class DataCollectionThread(QThread):
 
                     if time_to_sleep > 0:
                         time.sleep(time_to_sleep)
+
+    # Check if debugWindow has been opened, then update. If not in focus, scroll to bottom of page.
+    def update_debugger(self, string):
+        if self.debugger:
+
+            self.debugger.ui2.listView.addItem(string)
+
+            if not self.debugger.ui2.listView.hasFocus():
+                print("Not focussed")
+                self.debugger.ui2.listView.scrollToBottom()
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read, timestamp):
