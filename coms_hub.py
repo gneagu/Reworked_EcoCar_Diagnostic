@@ -445,7 +445,7 @@ class DataCollectionThread(QThread):
         if len(self.stack) > 0:
             # Empty stack
             for (command, variable_name, value) in self.stack:
-                to_send = "{} {} {}\n".format(command, variable_name, value)
+                to_send = "{} {} {}\n".format(command, variable_name.replace('\n',''), value)
                 print("Command sent to coms_hub: {}".format(to_send))
                 if debug == 0:
                     self.connection.write(to_send.encode(encoding='ascii'))
