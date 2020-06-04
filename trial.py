@@ -2,6 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 import sys
 import time
+from gui import debug
 
 
 class TestWindow(QtWidgets.QDialog):
@@ -10,13 +11,13 @@ class TestWindow(QtWidgets.QDialog):
 
         layout = QtWidgets.QVBoxLayout()
         self.table = QtWidgets.QTableWidget(2,2)
-        self.table.show()
+        # self.table.show()
 
         self.tableItem = QtWidgets.QLineEdit()
         self.tableItem.setText( "Testing" )
         self.table.setCellWidget(0, 0, self.tableItem )
         # Connect signal which is emmited when done editing qlineedit box
-
+        self.ui = debug.Ui_Dialog()
         
         # self.tableItem.textEdited.connect(self.doNot)
         # self.tableItem.focusInEvent = self.change
