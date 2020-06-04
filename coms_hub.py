@@ -5,6 +5,7 @@ import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI_v6
+from gui import debug as debug_window
 import random
 from functools import partial
 import csv
@@ -20,6 +21,14 @@ import pyqtgraph as pg
 from numpy import linspace
 
 debug = 1
+
+# Not a mainwindow (Is a dialog), so need to inherit from it
+# https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
+class DebugWindow(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(DebugWindow, self).__init__(parent)
+        self.ui2 = debug_window.Ui_Dialog()
+        self.ui2.setupUi(self)
 
 class MainWindow(QtWidgets.QDialog):
 
@@ -41,6 +50,7 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.open_version_window)
         self.ui.export_pushButton_5.clicked.connect(self.open_file_save_dialog)
+        self.ui.debug_pushButton_6.clicked.connect(self.open_debug_window)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -53,6 +63,15 @@ class MainWindow(QtWidgets.QDialog):
     def open_version_window(self):
         self.new_window = VersionWindow()
         self.new_window.show()
+
+    def open_debug_window(self):
+        self.debugger_window = DebugWindow(self)
+        # self.debugger_window.setupUi(self)
+        self.debugger_window.show()
+
+        # self.debugger_window.show()
+        # pass
+        self.thread.register_debugger(self.debugger_window)
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -197,6 +216,7 @@ class MainWindow(QtWidgets.QDialog):
                 ser.write(bitString.encode(encoding='ascii'))
                 time.sleep(0.1)
 
+
                 # Value list returns as ["command sent", "variable type", "variable name"]
                 # Variable name and type returned Ex//
                 valueList = ser.readline().decode(encoding='ascii').split(" ")
@@ -204,7 +224,7 @@ class MainWindow(QtWidgets.QDialog):
                 # Ex// ["VAL", "*VN#1:F", "MOT_I"]
                 valueName = valueList[-1]
                 valueType = valueList[1].split(":")[-1]
-
+            
                 # As of Python 3.7, dicts are ordered.
                 dict_value_type[valueName] = valueType
 
@@ -315,6 +335,7 @@ class DataCollectionThread(QThread):
         self.value_dict = {}
         self.graph_window_pointers = {}
         self.stack = []
+        self.debugger = 0
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -337,6 +358,14 @@ class DataCollectionThread(QThread):
     # Once reference to window is gone, garbage collection can get it.
     def unregister(self, variable):
         self.graph_window_pointers.pop(variable)
+
+    # Register debug window so it can be updated when open.
+    def register_debugger(self, variable):
+        self.debugger = variable
+
+    # Unregister debug window so can stop updating it.
+    def unregister_debugger(self):
+        self.debugger = 0
 
     # Need to be able to send values to the coms_hub. 
     # Creating stack as functions can send data, and only coms hub has access to write to connection
@@ -374,6 +403,12 @@ class DataCollectionThread(QThread):
                         #Command to get variable
                         bitString = "GET {}".format(name)
                         self.connection.write(bitString.encode(encoding='ascii'))
+
+                        # Update debug window we know what command was sent.
+                        self.debugger.listView.addItem(bitString.replace("\n",''))
+
+                        # Update debug window so we know what info was received.
+
 
                         try:
                             # Read value from Coms hub
