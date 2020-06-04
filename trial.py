@@ -77,7 +77,10 @@ class TestWindow(QtWidgets.QDialog):
         new_widget = QtWidgets.QLabel("GOT HERE{}".format(data))
         # self.ui.listView.addItem(QtWidgets.QListWidgetItem("TRIAL"))
         self.ui.listView.addItems(['a','s','d'])
-        self.ui.listView.scrollToBottom()
+
+        if not self.ui.listView.hasFocus():
+            print("Has focus")
+            self.ui.listView.scrollToBottom()
 
     	# print("The box is being clicked: {}".format(self.tableItem.hasFocus()))
 
