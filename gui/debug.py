@@ -27,7 +27,7 @@ class Ui_Dialog(object):
         self.scrollAreaWidgetContents = QtWidgets.QWidget()
         self.scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 259, 339))
         self.scrollAreaWidgetContents.setObjectName("scrollAreaWidgetContents")
-        self.listView = QtWidgets.QListView(self.scrollAreaWidgetContents)
+        self.listView = QtWidgets.QListWidget(self.scrollAreaWidgetContents)
         self.listView.setGeometry(QtCore.QRect(0, 0, 261, 341))
         self.listView.setObjectName("listView")
         self.scrollArea.setWidget(self.scrollAreaWidgetContents)

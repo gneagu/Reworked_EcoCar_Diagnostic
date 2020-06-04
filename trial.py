@@ -18,7 +18,9 @@ class TestWindow(QtWidgets.QDialog):
         self.table.setCellWidget(0, 0, self.tableItem )
         # Connect signal which is emmited when done editing qlineedit box
         self.ui = debug.Ui_Dialog()
-        
+        self.ui.setupUi(self)
+
+        # self.ui.show()
         # self.tableItem.textEdited.connect(self.doNot)
         # self.tableItem.focusInEvent = self.change
 
@@ -69,10 +71,15 @@ class TestWindow(QtWidgets.QDialog):
         self.thread.start()
 
     def update_data_view(self, data):
-    	if not self.tableItem.hasFocus():
-	    	self.tableItem.setText(str(data))
+    	# if not self.tableItem.hasFocus():
+	    # 	self.tableItem.setText(str(data))
 
-    	print("The box is being clicked: {}".format(self.tableItem.hasFocus()))
+        new_widget = QtWidgets.QLabel("GOT HERE{}".format(data))
+        # self.ui.listView.addItem(QtWidgets.QListWidgetItem("TRIAL"))
+        self.ui.listView.addItems(['a','s','d'])
+        self.ui.listView.scrollToBottom()
+
+    	# print("The box is being clicked: {}".format(self.tableItem.hasFocus()))
 
 
 class DataCollectionThread(QThread):
@@ -100,3 +107,22 @@ if __name__ == "__main__":
     window = TestWindow()
     window.show()
     sys.exit(app.exec_())
+
+
+# if __name__ == '__main__':
+
+#     app = QtWidgets.QApplication(sys.argv)
+
+
+#     listWidget = QtWidgets.QListWidget()
+#     listWidget.show()
+
+#     ls = ['test', 'test2', 'test3']
+
+#     listWidget.addItem('test')
+#     listWidget.addItem('test2')
+#     listWidget.addItem('test3')
+
+#     listWidget.addItems(ls)
+
+#     sys.exit(app.exec_())
