@@ -2,6 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 import sys
 import time
+from gui import debug
 
 
 class TestWindow(QtWidgets.QDialog):
@@ -10,14 +11,16 @@ class TestWindow(QtWidgets.QDialog):
 
         layout = QtWidgets.QVBoxLayout()
         self.table = QtWidgets.QTableWidget(2,2)
-        self.table.show()
+        # self.table.show()
 
         self.tableItem = QtWidgets.QLineEdit()
         self.tableItem.setText( "Testing" )
         self.table.setCellWidget(0, 0, self.tableItem )
         # Connect signal which is emmited when done editing qlineedit box
+        self.ui = debug.Ui_Dialog()
+        self.ui.setupUi(self)
 
-        
+        # self.ui.show()
         # self.tableItem.textEdited.connect(self.doNot)
         # self.tableItem.focusInEvent = self.change
 
@@ -68,10 +71,18 @@ class TestWindow(QtWidgets.QDialog):
         self.thread.start()
 
     def update_data_view(self, data):
-    	if not self.tableItem.hasFocus():
-	    	self.tableItem.setText(str(data))
+    	# if not self.tableItem.hasFocus():
+	    # 	self.tableItem.setText(str(data))
 
-    	print("The box is being clicked: {}".format(self.tableItem.hasFocus()))
+        new_widget = QtWidgets.QLabel("GOT HERE{}".format(data))
+        # self.ui.listView.addItem(QtWidgets.QListWidgetItem("TRIAL"))
+        self.ui.listView.addItems(['a','s','d'])
+
+        if not self.ui.listView.hasFocus():
+            print("Has focus")
+            self.ui.listView.scrollToBottom()
+
+    	# print("The box is being clicked: {}".format(self.tableItem.hasFocus()))
 
 
 class DataCollectionThread(QThread):
@@ -99,3 +110,22 @@ if __name__ == "__main__":
     window = TestWindow()
     window.show()
     sys.exit(app.exec_())
+
+
+# if __name__ == '__main__':
+
+#     app = QtWidgets.QApplication(sys.argv)
+
+
+#     listWidget = QtWidgets.QListWidget()
+#     listWidget.show()
+
+#     ls = ['test', 'test2', 'test3']
+
+#     listWidget.addItem('test')
+#     listWidget.addItem('test2')
+#     listWidget.addItem('test3')
+
+#     listWidget.addItems(ls)
+
+#     sys.exit(app.exec_())

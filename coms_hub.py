@@ -5,6 +5,7 @@ import sys
 from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI_v6
+from gui import debug as debug_window
 import random
 from functools import partial
 import csv
@@ -21,6 +22,14 @@ from numpy import linspace
 
 debug = 1
 
+# Need to open DebugWindow as a dialog so I can show it and interact.
+# https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
+class DebugWindow(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(DebugWindow, self).__init__(parent)
+        self.ui2 = debug_window.Ui_Dialog()
+        self.ui2.setupUi(self)
+
 class MainWindow(QtWidgets.QDialog):
 
     def __init__(self):
@@ -35,12 +44,14 @@ class MainWindow(QtWidgets.QDialog):
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
         self.thread = 0
+        self.debugger_window = 0
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
         self.ui.refresh_pushButton.clicked.connect(self.set_port_comboBox_selections)
         self.ui.version_pushButton_4.clicked.connect(self.open_version_window)
         self.ui.export_pushButton_5.clicked.connect(self.open_file_save_dialog)
+        self.ui.debug_pushButton_6.clicked.connect(self.open_debug_window)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -53,6 +64,12 @@ class MainWindow(QtWidgets.QDialog):
     def open_version_window(self):
         self.new_window = VersionWindow()
         self.new_window.show()
+
+    def open_debug_window(self):
+        self.debugger_window = DebugWindow(self)
+        self.debugger_window.show()
+
+        self.thread.register_debugger(self.debugger_window)
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -69,11 +86,15 @@ class MainWindow(QtWidgets.QDialog):
 
         if debug == 0:
 
-            if not self.connection:
-                print("MAKING A NEW CONNECTION")
+            try:
+                if not self.connection:
+                    print("MAKING A NEW CONNECTION")
 
-                portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
-                self.connection = portConnection
+                    portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
+                    self.connection = portConnection
+            except:
+                print("Failed To Make Connection")
+                return
 
         else:
             pass
@@ -204,7 +225,7 @@ class MainWindow(QtWidgets.QDialog):
                 # Ex// ["VAL", "*VN#1:F", "MOT_I"]
                 valueName = valueList[-1]
                 valueType = valueList[1].split(":")[-1]
-
+            
                 # As of Python 3.7, dicts are ordered.
                 dict_value_type[valueName] = valueType
 
@@ -236,21 +257,24 @@ class MainWindow(QtWidgets.QDialog):
         self.enable_com_buttons()
         # self.connection = self.port_connect()
         self.port_connect()
-        self.dict_value_type = self.get_value_name_dict(self.connection)
 
-        #Set the columns here.
-        self.add_columns(self.numOfVars)
+        # Adding condition because unless a connection is made, or debug. don't want to go any further.
+        if self.connection or debug == 1:
+            self.dict_value_type = self.get_value_name_dict(self.connection)
 
-        #Launch seperate thread to get variable from coms hub.
-        self.thread = DataCollectionThread()
-        self.thread.new_data_dict.connect(self.update_data_view)
+            #Set the columns here.
+            self.add_columns(self.numOfVars)
 
-        # https://stackoverflow.com/questions/45668961/send-data-to-qthread-when-in-have-changes-in-gui-windows-pyqt5
-        self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
-        self.thread.start()
+            #Launch seperate thread to get variable from coms hub.
+            self.thread = DataCollectionThread()
+            self.thread.new_data_dict.connect(self.update_data_view)
 
-        # Connect spinbox to worker thread, but only after thread created.
-        self.ui.time_spinBox.valueChanged.connect(self.thread.change_delay)
+            # https://stackoverflow.com/questions/45668961/send-data-to-qthread-when-in-have-changes-in-gui-windows-pyqt5
+            self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
+            self.thread.start()
+
+            # Connect spinbox to worker thread, but only after thread created.
+            self.ui.time_spinBox.valueChanged.connect(self.thread.change_delay)
 
     # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
@@ -315,6 +339,7 @@ class DataCollectionThread(QThread):
         self.value_dict = {}
         self.graph_window_pointers = {}
         self.stack = []
+        self.debugger = 0
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -337,6 +362,17 @@ class DataCollectionThread(QThread):
     # Once reference to window is gone, garbage collection can get it.
     def unregister(self, variable):
         self.graph_window_pointers.pop(variable)
+
+    # Register debug window so it can be updated when open.
+    def register_debugger(self, variable):
+        print("Registered debugger window.")
+        print(variable)
+        self.debugger = variable
+
+    # Unregister debug window so can stop updating it.
+    def unregister_debugger(self):
+        print("Unregistered debugger window.")
+        self.debugger = 0
 
     # Need to be able to send values to the coms_hub. 
     # Creating stack as functions can send data, and only coms hub has access to write to connection
@@ -375,9 +411,17 @@ class DataCollectionThread(QThread):
                         bitString = "GET {}".format(name)
                         self.connection.write(bitString.encode(encoding='ascii'))
 
+                        # Update debug window we know what command was sent.
+                        self.update_debugger(bitString.replace("\n",''))
+
                         try:
                             # Read value from Coms hub
-                            value = self.connection.readline().decode(encoding='ascii').split(" ")[-1]
+                            received = self.connection.readline().decode(encoding='ascii')
+                            value = received.split(" ")[-1]
+                            
+                            # Update debug window so we know what info was received.
+                            self.update_debugger(received.replace("\n",''))
+
                             if type == 'F':
                                 values_read[name] = float(value)
                             else:
@@ -415,7 +459,10 @@ class DataCollectionThread(QThread):
 
                     self.write_to_file(values_read)
 
-                    #TODO: Send out data from the stack
+                    # Update debugger window
+                    self.update_debugger("Got fake data.")
+
+                    #Send out data from the stack
                     self.empty_stack()
 
                     # Getting time in milliseconds
@@ -429,6 +476,16 @@ class DataCollectionThread(QThread):
 
                     if time_to_sleep > 0:
                         time.sleep(time_to_sleep)
+
+    # Check if debugWindow has been opened, then update. If not in focus, scroll to bottom of page.
+    def update_debugger(self, string):
+        if self.debugger:
+
+            self.debugger.ui2.listView.addItem(string)
+
+            if not self.debugger.ui2.listView.hasFocus():
+                print("Not focussed")
+                self.debugger.ui2.listView.scrollToBottom()
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read, timestamp):
