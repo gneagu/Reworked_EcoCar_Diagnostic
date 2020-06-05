@@ -22,7 +22,7 @@ from numpy import linspace
 
 debug = 1
 
-# Not a mainwindow (Is a dialog), so need to inherit from it
+# Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
 class DebugWindow(QtWidgets.QDialog):
     def __init__(self, parent=None):
@@ -44,6 +44,7 @@ class MainWindow(QtWidgets.QDialog):
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
         self.thread = 0
+        self.debugger_window = 0
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -66,11 +67,8 @@ class MainWindow(QtWidgets.QDialog):
 
     def open_debug_window(self):
         self.debugger_window = DebugWindow(self)
-        # self.debugger_window.setupUi(self)
         self.debugger_window.show()
 
-        # self.debugger_window.show()
-        # pass
         self.thread.register_debugger(self.debugger_window)
 
     # Over-riding close event so I can end the DataCollectionThread also.
@@ -88,11 +86,15 @@ class MainWindow(QtWidgets.QDialog):
 
         if debug == 0:
 
-            if not self.connection:
-                print("MAKING A NEW CONNECTION")
+            try:
+                if not self.connection:
+                    print("MAKING A NEW CONNECTION")
 
-                portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
-                self.connection = portConnection
+                    portConnection = serial.Serial(COM_port, baud_rate, bytesize=8, parity='N', stopbits=1)
+                    self.connection = portConnection
+            except:
+                print("Failed To Make Connection")
+                return
 
         else:
             pass
@@ -255,21 +257,24 @@ class MainWindow(QtWidgets.QDialog):
         self.enable_com_buttons()
         # self.connection = self.port_connect()
         self.port_connect()
-        self.dict_value_type = self.get_value_name_dict(self.connection)
 
-        #Set the columns here.
-        self.add_columns(self.numOfVars)
+        # Adding condition because unless a connection is made, or debug. don't want to go any further.
+        if self.connection or debug == 1:
+            self.dict_value_type = self.get_value_name_dict(self.connection)
 
-        #Launch seperate thread to get variable from coms hub.
-        self.thread = DataCollectionThread()
-        self.thread.new_data_dict.connect(self.update_data_view)
+            #Set the columns here.
+            self.add_columns(self.numOfVars)
 
-        # https://stackoverflow.com/questions/45668961/send-data-to-qthread-when-in-have-changes-in-gui-windows-pyqt5
-        self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
-        self.thread.start()
+            #Launch seperate thread to get variable from coms hub.
+            self.thread = DataCollectionThread()
+            self.thread.new_data_dict.connect(self.update_data_view)
 
-        # Connect spinbox to worker thread, but only after thread created.
-        self.ui.time_spinBox.valueChanged.connect(self.thread.change_delay)
+            # https://stackoverflow.com/questions/45668961/send-data-to-qthread-when-in-have-changes-in-gui-windows-pyqt5
+            self.thread.setup(self.dict_value_type, self.connection, self.time_delay)
+            self.thread.start()
+
+            # Connect spinbox to worker thread, but only after thread created.
+            self.ui.time_spinBox.valueChanged.connect(self.thread.change_delay)
 
     # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
