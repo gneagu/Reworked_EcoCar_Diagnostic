@@ -305,7 +305,7 @@ class MainWindow(QtWidgets.QDialog):
     # This function updates the values in the main window.
     def update_data_view(self, data):
         i = 0
-        data.pop('Timestamp') # Timestamp data point added to data, so need to pop it.
+        # data.pop('Timestamp') # Timestamp data point added to data, so need to pop it.
 
         for (name, value) in data.items():
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
@@ -513,9 +513,10 @@ class DataCollectionThread(QThread):
         #Get time stamp in miliseconds since thread start
         timestamp = (time.time() * 1000) - self.time_stamp_thread_start
 
-        values["Timestamp"] = math.floor(timestamp)
+        dict_to_write = values.copy()
+        dict_to_write["Timestamp"] = math.floor(timestamp)
 
-        self.writer.writerow(values)
+        self.writer.writerow(dict_to_write)
         self.csvfile.flush()
 
     # https://stackoverflow.com/questions/15416334/qfiledialog-how-to-set-default-filename-in-save-as-dialog
