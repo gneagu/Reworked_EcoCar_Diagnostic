@@ -359,6 +359,7 @@ class DataCollectionThread(QThread):
         self.graph_window_pointers = {}
         self.stack = []
         self.debugger = 0
+        self.eventWindow = 0
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -392,6 +393,15 @@ class DataCollectionThread(QThread):
     def unregister_debugger(self):
         print("Unregistered debugger window.")
         self.debugger = 0
+
+    # Keeping reference to window so I can update it
+    def register_events(self, variable):
+        print("Registered event window.")
+        print(variable)
+        self.eventWindow = variable
+
+    def unregister_events(self):
+        self.eventWindow = 0
 
     # Need to be able to send values to the coms_hub. 
     # Creating stack as functions can send data, and only coms hub has access to write to connection
