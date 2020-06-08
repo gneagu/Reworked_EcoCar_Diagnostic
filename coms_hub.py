@@ -6,6 +6,8 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI_v6
 from gui import debug as debug_window
+from gui import eventUI as event_window
+
 import random
 from functools import partial
 import csv
@@ -30,6 +32,14 @@ class DebugWindow(QtWidgets.QDialog):
         self.ui2 = debug_window.Ui_Dialog()
         self.ui2.setupUi(self)
 
+# Need to open DebugWindow as a dialog so I can show it and interact.
+# https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
+class EventWindow(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(EventWindow, self).__init__(parent)
+        self.ui3 = event_window.Ui_EventWindow()
+        self.ui3.setupUi(self)
+
 class MainWindow(QtWidgets.QDialog):
 
     def __init__(self):
@@ -45,6 +55,7 @@ class MainWindow(QtWidgets.QDialog):
         self.time_delay = self.ui.time_spinBox.value()
         self.thread = 0
         self.debugger_window = 0
+        self.event_window = 0
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -52,6 +63,8 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.version_pushButton_4.clicked.connect(self.open_version_window)
         self.ui.export_pushButton_5.clicked.connect(self.open_file_save_dialog)
         self.ui.debug_pushButton_6.clicked.connect(self.open_debug_window)
+        self.ui.events_pushButton_3.clicked.connect(self.open_event_window)
+
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
@@ -70,6 +83,13 @@ class MainWindow(QtWidgets.QDialog):
         self.debugger_window.show()
 
         self.thread.register_debugger(self.debugger_window)
+
+    def open_event_window(self):
+        self.event_window = EventWindow(self)
+        self.event_window.show()
+
+        print("OPENED EVENT WEINDOW")
+        # self.thread.register_event(self.event_window)
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -305,7 +325,6 @@ class MainWindow(QtWidgets.QDialog):
     # This function updates the values in the main window.
     def update_data_view(self, data):
         i = 0
-        # data.pop('Timestamp') # Timestamp data point added to data, so need to pop it.
 
         for (name, value) in data.items():
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
