@@ -423,25 +423,27 @@ class DataCollectionThread(QThread):
         with open('temp/{}'.format(self.file_name), 'w', newline='') as self.csvfile:
             fieldnames = ["Timestamp"] + list(self.value_dict.keys())
             self.writer = csv.DictWriter(self.csvfile, delimiter = "\t", fieldnames=fieldnames)
-
             self.writer.writeheader()
 
-            if debug == 0:
+            #From the dictionary, get value name, and expected value type.
+            while True:
+                # Getting time in milliseconds
+                time_start = time.time() * 1000
+                timestamp = time_start - self.time_stamp_thread_start
 
-                #From the dictionary, get value name, and expected value type.
-                while True:
-                    # Getting time in milliseconds
-                    time_start = time.time() * 1000
-                    timestamp = time_start - self.time_stamp_thread_start
+                values_read = {}
 
-                    for name, type in self.value_dict.items():
 
-                        #Command to get variable
-                        bitString = "GET {}".format(name)
-                        self.connection.write(bitString.encode(encoding='ascii'))
+                for name, type in self.value_dict.items():
 
-                        # Update debug window we know what command was sent.
-                        self.update_debugger(bitString.replace("\n",''))
+                    #Command to get variable
+                    bitString = "GET {}".format(name)
+                    self.connection.write(bitString.encode(encoding='ascii'))
+
+                    # Update debug window we know what command was sent.
+                    self.update_debugger(bitString.replace("\n",''))
+
+                    if debug == 0:
 
                         try:
                             # Read value from Coms hub
@@ -459,52 +461,31 @@ class DataCollectionThread(QThread):
                             print("Error, at reading data")
                             pass
 
-                    self.update_registered_windows(values_read, timestamp)
-                    self.new_data_dict.emit(values_read)
+                    else:
+                        values_read = generate_random_data()
 
-                    self.write_to_file(values_read)
+                        # Update debugger window
+                        self.update_debugger("Got fake data.")
 
-                    #TODO: Send out data from the stack
-                    self.empty_stack()
+                self.update_registered_windows(values_read, timestamp)
+                self.new_data_dict.emit(values_read)
 
-                    # Getting time in milliseconds
-                    time_end = time.time() * 1000
+                self.write_to_file(values_read)
 
-                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                    # last, and not just y milliseconds work + x milliseconds delay
-                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+                #TODO: Send out data from the stack
+                self.empty_stack()
 
+                # Getting time in milliseconds
+                time_end = time.time() * 1000
+
+                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                # last, and not just y milliseconds work + x milliseconds delay
+                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+
+                print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+
+                if time_to_sleep > 0:
                     time.sleep(time_to_sleep)
-
-            else:
-                while True:
-                    # Getting time in milliseconds
-                    time_start = time.time() * 1000
-                    timestamp = time_start - self.time_stamp_thread_start
-
-                    values_read = generate_random_data()
-                    self.new_data_dict.emit(values_read)
-                    self.update_registered_windows(values_read, timestamp)
-
-                    self.write_to_file(values_read)
-
-                    # Update debugger window
-                    self.update_debugger("Got fake data.")
-
-                    #Send out data from the stack
-                    self.empty_stack()
-
-                    # Getting time in milliseconds
-                    time_end = time.time() * 1000
-
-                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                    # last, and not just y milliseconds work + x milliseconds delay
-                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
-                    print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
-
-                    if time_to_sleep > 0:
-                        time.sleep(time_to_sleep)
 
     # Check if debugWindow has been opened, then update. If not in focus, scroll to bottom of page.
     def update_debugger(self, string):
