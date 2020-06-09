@@ -149,7 +149,7 @@ class MainWindow(QtWidgets.QDialog):
         self.buttons = []
 
         i = 0
-        print(self.dict_value_type)
+        # print(self.dict_value_type)
 
         for name in self.dict_value_type:
         # for i in range(int(self.numOfVars)):
@@ -205,13 +205,21 @@ class MainWindow(QtWidgets.QDialog):
             print("Failed tooltip")
 
         # Check if window is there, otherwise do not open window
+        # TODO: ISSUE IN THAT USING BOTH self.dialogs and self.graph_window_pointers
+
+        print("Registered dialgos")
+        print(self.dialogs)
         if variable_name not in self.dialogs:
+            print("Registered new graph window")
             self.newWindow = GraphWindow(self.thread, variable_name)
 
             self.dialogs[variable_name] = self.newWindow
             self.thread.register(self.dialogs[variable_name], variable_name)
 
         self.dialogs[variable_name].show()
+
+        print("After dialgos")
+        print(self.dialogs)
 
 
     def get_value_name_dict(self, serial):
@@ -252,7 +260,7 @@ class MainWindow(QtWidgets.QDialog):
         else:
             self.numOfVars = 6
             dict_value_type = generate_random_data()
-            print(dict_value_type)
+            # print(dict_value_type)
 
         return dict_value_type
 
@@ -335,8 +343,8 @@ class MainWindow(QtWidgets.QDialog):
     
             i = i + 1
 
-        print("Updating Data in Widget:")
-        print(data)
+        # print("Updating Data in Widget:")
+        # print(data)
 
 # This thread works independently on the main.
 # This one gets each value from the coms hub
@@ -375,12 +383,15 @@ class DataCollectionThread(QThread):
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
     def register(self, window, variable):
         print("I HAVE BEEN REGISTERED")
+        print(self.graph_window_pointers)
         if variable not in self.graph_window_pointers:
             self.graph_window_pointers[variable] = window
 
     # Remove a window from list of windows to be updated.
     # Once reference to window is gone, garbage collection can get it.
     def unregister(self, variable):
+        print("Unregistering graph: {}".format(variable))
+        print(self.graph_window_pointers)
         self.graph_window_pointers.pop(variable)
 
     # Register debug window so it can be updated when open.
@@ -434,18 +445,19 @@ class DataCollectionThread(QThread):
                 values_read = {}
 
 
-                for name, type in self.value_dict.items():
+                if debug == 0:
 
-                    #Command to get variable
-                    bitString = "GET {}".format(name)
-                    self.connection.write(bitString.encode(encoding='ascii'))
+                    try:
 
-                    # Update debug window we know what command was sent.
-                    self.update_debugger(bitString.replace("\n",''))
+                        for name, type in self.value_dict.items():
 
-                    if debug == 0:
+                            #Command to get variable
+                            bitString = "GET {}".format(name)
+                            self.connection.write(bitString.encode(encoding='ascii'))
 
-                        try:
+                            # Update debug window we know what command was sent.
+                            self.update_debugger(bitString.replace("\n",''))
+
                             # Read value from Coms hub
                             received = self.connection.readline().decode(encoding='ascii')
                             value = received.split(" ")[-1]
@@ -457,15 +469,15 @@ class DataCollectionThread(QThread):
                                 values_read[name] = float(value)
                             else:
                                 values_read[name] = value
-                        except: #Sometimes get here when reset 
-                            print("Error, at reading data")
-                            pass
+                    except: #Sometimes get here when reset 
+                        print("Error, at reading data")
+                        pass
 
-                    else:
-                        values_read = generate_random_data()
+                else:
+                    values_read = generate_random_data()
 
-                        # Update debugger window
-                        self.update_debugger("Got fake data.")
+                    # Update debugger window
+                    self.update_debugger("Got fake data.")
 
                 self.update_registered_windows(values_read, timestamp)
                 self.new_data_dict.emit(values_read)
@@ -482,7 +494,7 @@ class DataCollectionThread(QThread):
                 # last, and not just y milliseconds work + x milliseconds delay
                 time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
 
-                print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+                # print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
                 if time_to_sleep > 0:
                     time.sleep(time_to_sleep)
@@ -500,11 +512,11 @@ class DataCollectionThread(QThread):
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read, timestamp):
         if len(self.graph_window_pointers) != 0:
-            print("Updating {} graph windows".format(self.graph_window_pointers))
+            # print("Updating {} graph windows".format(self.graph_window_pointers))
 
             for registered_window in self.graph_window_pointers:
-                print("Calling window: {}".format(registered_window))
-                print(values_read[registered_window])
+                # print("Calling window: {}".format(registered_window))
+                # print(values_read[registered_window])
                 self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
 
 
@@ -598,7 +610,7 @@ class GraphWindow(QtWidgets.QDialog):
     # Simple update is okay as it doesn't impact performance.
     # Very quick, so wont block GUI from responding.
     def receive_data(self, data, timestamp):
-        print("Got data: {}".format(data))
+        # print("Got data: {}".format(data))
         self.value.pop(0)
         self.value.append(int(data))
 
