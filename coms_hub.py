@@ -89,7 +89,7 @@ class MainWindow(QtWidgets.QDialog):
         self.event_window.show()
 
         print("OPENED EVENT WEINDOW")
-        # self.thread.register_event(self.event_window)
+        self.thread.register_events(self.event_window)
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -207,8 +207,10 @@ class MainWindow(QtWidgets.QDialog):
         # Check if window is there, otherwise do not open window
         # TODO: ISSUE IN THAT USING BOTH self.dialogs and self.graph_window_pointers
 
-        print("Registered dialgos")
+
+        print("IN DIALOGS")
         print(self.dialogs)
+
         if variable_name not in self.dialogs:
             print("Registered new graph window")
             self.newWindow = GraphWindow(self.thread, variable_name)
@@ -217,10 +219,6 @@ class MainWindow(QtWidgets.QDialog):
             self.thread.register(self.dialogs[variable_name], variable_name)
 
         self.dialogs[variable_name].show()
-
-        print("After dialgos")
-        print(self.dialogs)
-
 
     def get_value_name_dict(self, serial):
         ser = self.connection
@@ -392,7 +390,8 @@ class DataCollectionThread(QThread):
     def unregister(self, variable):
         print("Unregistering graph: {}".format(variable))
         print(self.graph_window_pointers)
-        self.graph_window_pointers.pop(variable)
+        if variable in self.graph_window_pointers:
+            self.graph_window_pointers.pop(variable)
 
     # Register debug window so it can be updated when open.
     def register_debugger(self, variable):
@@ -475,6 +474,13 @@ class DataCollectionThread(QThread):
 
                 else:
                     values_read = generate_random_data()
+
+                    if (math.floor(time.time() * 1000)) % 7 == 0:
+                        # self
+                        # pass
+                        if self.eventWindow:
+                            self.eventWindow.ui3.eventList.addItem("Had an event")
+                            self.eventWindow.ui3.alarmList.addItem("Had an alarm")
 
                     # Update debugger window
                     self.update_debugger("Got fake data.")
