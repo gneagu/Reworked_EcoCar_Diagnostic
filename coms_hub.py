@@ -27,10 +27,16 @@ debug = 1
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
 class DebugWindow(QtWidgets.QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, dct_thread_pointer, parent=None):
         super(DebugWindow, self).__init__(parent)
         self.ui2 = debug_window.Ui_Dialog()
         self.ui2.setupUi(self)
+        self.unregister_pointer = dct_thread_pointer
+
+    # https://stackoverflow.com/a/12366684
+    def closeEvent(self, evnt):
+        self.unregister_pointer.unregister_debugger()
+        super(DebugWindow, self).closeEvent(evnt)
 
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -43,9 +49,7 @@ class EventWindow(QtWidgets.QDialog):
 
     # https://stackoverflow.com/a/12366684
     def closeEvent(self, evnt):
-
         self.unregister_pointer.unregister_events()
-
         super(EventWindow, self).closeEvent(evnt)
 
 class MainWindow(QtWidgets.QDialog):
@@ -82,18 +86,9 @@ class MainWindow(QtWidgets.QDialog):
         self.new_window.show()
 
     def open_debug_window(self):
-        self.debugger_window = DebugWindow(self)
-        self.debugger_window.show()
-
-        self.thread.register_debugger(self.debugger_window)
+        self.thread.register_debugger(self)
 
     def open_event_window(self):
-        # Create window with pointer to DCT thread so can unregister on close. 
-        # Local variable so it can be closed on
-        # event_window = EventWindow(self, self.thread)
-        # event_window.show()
-
-        # print("OPENED EVENT WEINDOW")
         self.thread.register_events(self)
 
     # Over-riding close event so I can end the DataCollectionThread also.
@@ -399,10 +394,12 @@ class DataCollectionThread(QThread):
             self.graph_window_pointers.pop(variable)
 
     # Register debug window so it can be updated when open.
-    def register_debugger(self, variable):
+    def register_debugger(self, main_window_reference):
         print("Registered debugger window.")
-        print(variable)
-        self.debugger = variable
+
+        if not self.debugger:
+            self.debugger = DebugWindow(self, main_window_reference)
+            self.debugger.show()
 
     # Unregister debug window so can stop updating it.
     def unregister_debugger(self):
@@ -411,21 +408,16 @@ class DataCollectionThread(QThread):
 
     # Keeping reference to window so I can update it
     def register_events(self, main_window_reference):
-
         print("Registered event window.")
-        # print(variable)
-
     
         # Register window only if another doesn't exist.
         if not self.eventWindow:
-            print(" in show")
-            # self.eventWindow = variable
             self.eventWindow = EventWindow(self,main_window_reference)
-
             self.eventWindow.show()
 
     def unregister_events(self):
         # Remove reference (garbage collection will get it)
+        print("Unregistered event window.")
         self.eventWindow = 0
 
     # Need to be able to send values to the coms_hub. 
