@@ -35,10 +35,18 @@ class DebugWindow(QtWidgets.QDialog):
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
 class EventWindow(QtWidgets.QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, dct_thread_pointer, parent=None):
         super(EventWindow, self).__init__(parent)
         self.ui3 = event_window.Ui_EventWindow()
         self.ui3.setupUi(self)
+        self.unregister_pointer = dct_thread_pointer
+
+    # https://stackoverflow.com/a/12366684
+    def closeEvent(self, evnt):
+
+        self.unregister_pointer.unregister_events()
+
+        super(EventWindow, self).closeEvent(evnt)
 
 class MainWindow(QtWidgets.QDialog):
 
@@ -65,13 +73,8 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.debug_pushButton_6.clicked.connect(self.open_debug_window)
         self.ui.events_pushButton_3.clicked.connect(self.open_event_window)
 
-
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
-
-    def show_trial_screen(self):
-        self.thread.register()
-        self.dialog.show()
 
     # Simple function. Bind window to a variable, else garbage collection gets it
     def open_version_window(self):
@@ -85,11 +88,13 @@ class MainWindow(QtWidgets.QDialog):
         self.thread.register_debugger(self.debugger_window)
 
     def open_event_window(self):
-        self.event_window = EventWindow(self)
-        self.event_window.show()
+        # Create window with pointer to DCT thread so can unregister on close. 
+        # Local variable so it can be closed on
+        # event_window = EventWindow(self, self.thread)
+        # event_window.show()
 
-        print("OPENED EVENT WEINDOW")
-        self.thread.register_events(self.event_window)
+        # print("OPENED EVENT WEINDOW")
+        self.thread.register_events(self)
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -405,12 +410,22 @@ class DataCollectionThread(QThread):
         self.debugger = 0
 
     # Keeping reference to window so I can update it
-    def register_events(self, variable):
+    def register_events(self, main_window_reference):
+
         print("Registered event window.")
-        print(variable)
-        self.eventWindow = variable
+        # print(variable)
+
+    
+        # Register window only if another doesn't exist.
+        if not self.eventWindow:
+            print(" in show")
+            # self.eventWindow = variable
+            self.eventWindow = EventWindow(self,main_window_reference)
+
+            self.eventWindow.show()
 
     def unregister_events(self):
+        # Remove reference (garbage collection will get it)
         self.eventWindow = 0
 
     # Need to be able to send values to the coms_hub. 
@@ -472,12 +487,12 @@ class DataCollectionThread(QThread):
                         print("Error, at reading data")
                         pass
 
+                    # Code to run if debugging without coms_hub
                 else:
                     values_read = generate_random_data()
 
+                    # Randomly populate events window with alarm and event entries.
                     if (math.floor(time.time() * 1000)) % 7 == 0:
-                        # self
-                        # pass
                         if self.eventWindow:
                             self.eventWindow.ui3.eventList.addItem("Had an event")
                             self.eventWindow.ui3.alarmList.addItem("Had an alarm")
