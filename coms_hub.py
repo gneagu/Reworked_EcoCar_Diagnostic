@@ -410,6 +410,26 @@ class DataCollectionThread(QThread):
         self.stack.append((command, variable, value))
         print(self.stack)
 
+
+    # Idea here is that we can recieve an error or alarm from the coms hub at any time. 
+    # Either Ex// b'VAL *VCOUNT 11\n' or Ex// b'EVT HORN\n' or Ex// b'ALM HORN\n'
+    def check_serial_buffer(self):
+        # pass
+        # received = self.connection.readline().decode(encoding='ascii')
+        while self.connection.inWaiting():
+            received = self.connection.readline().decode(encoding='ascii').replace("\n",'')
+
+            if received.split(" ")[0] == "VAL":
+                return(received)
+            elif received.split(" ")[0] == "EVT":
+                current_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
+                self.eventWindow.ui3.eventList.addItem("{} : {}".format(received, current_time))
+            elif received.split(" ")[0] == "VAL":
+                current_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
+                self.eventWindow.ui3.alarmList.addItem(received, current_time)
+            else:
+                print("Unhandled data returned from coms hub.")
+
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
     def run(self):
@@ -434,11 +454,14 @@ class DataCollectionThread(QThread):
 
                 values_read = {}
 
+                print(self.value_dict)
+
 
                 if debug == 0:
 
                     try:
 
+                        # TODO: Need to check 
                         for name, type in self.value_dict.items():
 
                             #Command to get variable
@@ -448,17 +471,24 @@ class DataCollectionThread(QThread):
                             # Update debug window we know what command was sent.
                             self.update_debugger(bitString.replace("\n",''))
 
+
+                            # TODO: Check to see if have an error. (Loop while available, and check to see if event?)
+
                             # Read value from Coms hub
-                            received = self.connection.readline().decode(encoding='ascii')
+
+                            received = self.check_serial_buffer()
                             value = received.split(" ")[-1]
                             
                             # Update debug window so we know what info was received.
-                            self.update_debugger(received.replace("\n",''))
+                            self.update_debugger(received)
 
                             if type == 'F':
                                 values_read[name] = float(value)
                             else:
                                 values_read[name] = value
+
+                            self.empty_stack()
+
                     except: #Sometimes get here when reset 
                         print("Error, at reading data")
                         pass
@@ -481,7 +511,7 @@ class DataCollectionThread(QThread):
 
                 self.write_to_file(values_read)
 
-                #TODO: Send out data from the stack
+                #Send out data from the stack
                 self.empty_stack()
 
                 # Getting time in milliseconds
@@ -491,7 +521,7 @@ class DataCollectionThread(QThread):
                 # last, and not just y milliseconds work + x milliseconds delay
                 time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
 
-                # print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+                print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
                 if time_to_sleep > 0:
                     time.sleep(time_to_sleep)
@@ -511,12 +541,17 @@ class DataCollectionThread(QThread):
         if len(self.graph_window_pointers) != 0:
             # print("Updating {} graph windows".format(self.graph_window_pointers))
 
-            for registered_window in self.graph_window_pointers:
-                # print("Calling window: {}".format(registered_window))
-                # print(values_read[registered_window])
-                print(self.graph_window_pointers)
-                self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
-
+            try:
+                for registered_window in self.graph_window_pointers:
+                    # print("Calling window: {}".format(registered_window))
+                    # print(values_read[registered_window])
+                    print(self.graph_window_pointers)
+                    self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
+            except RuntimeError as e:
+                print("Encountered error: {} ".format(e))
+                print("Usually dictionary changing size (unregister) while this function is looping")
+            except:
+                print("Don't know what error occured.")
 
     def empty_stack(self):
         if len(self.stack) > 0:
@@ -524,6 +559,8 @@ class DataCollectionThread(QThread):
             for (command, variable_name, value) in self.stack:
                 to_send = "{} {} {}\n".format(command, variable_name.replace('\n',''), value)
                 print("Command sent to coms_hub: {}".format(to_send))
+
+                # Only write if we have a connection open
                 if debug == 0:
                     self.connection.write(to_send.encode(encoding='ascii'))
                 self.stack.pop(0)
