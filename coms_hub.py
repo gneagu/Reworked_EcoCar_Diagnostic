@@ -66,8 +66,6 @@ class MainWindow(QtWidgets.QDialog):
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
         self.thread = 0
-        self.debugger_window = 0
-        self.event_window = 0
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -136,7 +134,6 @@ class MainWindow(QtWidgets.QDialog):
         for index in range(totalColumns)[::-1]:
             self.ui.tableWidget.removeColumn(index)
 
-
     # https://stackoverflow.com/questions/40815730/how-to-add-and-retrieve-items-to-and-from-qtablewidget
     def add_columns(self, numOfVars):
         self.empty_table_widget()
@@ -149,7 +146,6 @@ class MainWindow(QtWidgets.QDialog):
         self.buttons = []
 
         i = 0
-        # print(self.dict_value_type)
 
         for name in self.dict_value_type:
         # for i in range(int(self.numOfVars)):
@@ -158,7 +154,6 @@ class MainWindow(QtWidgets.QDialog):
             # Create Button to push to tableWidget
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
-            # self.buttons[i].setToolTip(str(name))
             self.buttons[i].setToolTip(name)
 
             # Create textedit, and link to variable
@@ -174,7 +169,6 @@ class MainWindow(QtWidgets.QDialog):
             self.buttons[i].clicked.connect(partial(self.on_pushButton_clicked, self.buttons[i]))
 
             i = i + 1
-
 
     # https://stackoverflow.com/a/57698918
     # Custom event filter to know when to send data to coms.
@@ -204,21 +198,9 @@ class MainWindow(QtWidgets.QDialog):
         except:
             print("Failed tooltip")
 
-        # Check if window is there, otherwise do not open window
-        # TODO: ISSUE IN THAT USING BOTH self.dialogs and self.graph_window_pointers
-
-
-        print("IN DIALOGS")
-        print(self.dialogs)
-
-        if variable_name not in self.dialogs:
-            print("Registered new graph window")
-            self.newWindow = GraphWindow(self.thread, variable_name)
-
-            self.dialogs[variable_name] = self.newWindow
-            self.thread.register(self.dialogs[variable_name], variable_name)
-
-        self.dialogs[variable_name].show()
+        # Simply call DCT.register with window reference, and variable name.
+        # Let DCT create window and keep track, so we only have one list.
+        self.thread.register(self.thread, variable_name)
 
     def get_value_name_dict(self, serial):
         ser = self.connection
@@ -316,7 +298,7 @@ class MainWindow(QtWidgets.QDialog):
 
             #Check if any ports are available.
             if len(list_of_ports) == 0:
-                self.ui.com_port_comboBox.addItem("No Ports Found")
+                self.ui.com_port_comboBox.addItem("No Com Ports Found")
                 self.ui.set_pushButton_2.setEnabled(False);
             else:
                 self.ui.set_pushButton_2.setEnabled(True);
@@ -340,9 +322,6 @@ class MainWindow(QtWidgets.QDialog):
                 self.textedits[name].setText(str(data[name]))
     
             i = i + 1
-
-        # print("Updating Data in Widget:")
-        # print(data)
 
 # This thread works independently on the main.
 # This one gets each value from the coms hub
@@ -379,11 +358,16 @@ class DataCollectionThread(QThread):
 
     # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
-    def register(self, window, variable):
-        print("I HAVE BEEN REGISTERED")
-        print(self.graph_window_pointers)
-        if variable not in self.graph_window_pointers:
-            self.graph_window_pointers[variable] = window
+    def register(self, dct_reference, variable_name):
+        if variable_name not in self.graph_window_pointers:
+            print("REGISTERED NEW WINDOW")
+
+            # Create new graph window, and keep pointer.
+            newWindow = GraphWindow(dct_reference, variable_name)
+            self.graph_window_pointers[variable_name] = newWindow
+
+            # Show window.
+            self.graph_window_pointers[variable_name].show()
 
     # Remove a window from list of windows to be updated.
     # Once reference to window is gone, garbage collection can get it.
@@ -530,6 +514,7 @@ class DataCollectionThread(QThread):
             for registered_window in self.graph_window_pointers:
                 # print("Calling window: {}".format(registered_window))
                 # print(values_read[registered_window])
+                print(self.graph_window_pointers)
                 self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
 
 
