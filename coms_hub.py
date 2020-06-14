@@ -22,7 +22,7 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
-debug = 0
+debug = 1
 
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -41,16 +41,11 @@ class DebugWindow(QtWidgets.QDialog):
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
 class EventWindow(QtWidgets.QDialog):
-    def __init__(self, dct_thread_pointer, parent=None):
+    def __init__(self, parent=None):
         super(EventWindow, self).__init__(parent)
         self.ui3 = event_window.Ui_EventWindow()
         self.ui3.setupUi(self)
-        self.unregister_pointer = dct_thread_pointer
-
-    # https://stackoverflow.com/a/12366684
-    def closeEvent(self, evnt):
-        self.unregister_pointer.unregister_events()
-        super(EventWindow, self).closeEvent(evnt)
+        # self.unregister_pointer = dct_thread_pointer
 
 class MainWindow(QtWidgets.QDialog):
 
@@ -87,7 +82,7 @@ class MainWindow(QtWidgets.QDialog):
         self.thread.register_debugger(self)
 
     def open_event_window(self):
-        self.thread.register_events(self)
+        self.thread.show_events_window(self)
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -270,7 +265,7 @@ class MainWindow(QtWidgets.QDialog):
         if self.connection or debug == 1:
             self.dict_value_type = self.get_value_name_dict(self.connection)
 
-            #Set the columns here.
+            #Set the columns here.0
             self.add_columns(self.numOfVars)
 
             #Launch seperate thread to get variable from coms hub.
@@ -344,7 +339,7 @@ class DataCollectionThread(QThread):
         self.graph_window_pointers = {}
         self.stack = []
         self.debugger = 0
-        self.eventWindow = 0
+        self.eventWindow = EventWindow()
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -391,18 +386,10 @@ class DataCollectionThread(QThread):
         self.debugger = 0
 
     # Keeping reference to window so I can update it
-    def register_events(self, main_window_reference):
+    def show_events_window(self, main_window_reference):
         print("Registered event window.")
     
-        # Register window only if another doesn't exist.
-        if not self.eventWindow:
-            self.eventWindow = EventWindow(self,main_window_reference)
-            self.eventWindow.show()
-
-    def unregister_events(self):
-        # Remove reference (garbage collection will get it)
-        print("Unregistered event window.")
-        self.eventWindow = 0
+        self.eventWindow.show()
 
     # Need to be able to send values to the coms_hub. 
     # Creating stack as functions can send data, and only coms hub has access to write to connection
