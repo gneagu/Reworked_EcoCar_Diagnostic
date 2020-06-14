@@ -22,7 +22,7 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
-debug = 1
+debug = 0
 
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -419,14 +419,18 @@ class DataCollectionThread(QThread):
         while self.connection.inWaiting():
             received = self.connection.readline().decode(encoding='ascii').replace("\n",'')
 
+            print(received)
+
             if received.split(" ")[0] == "VAL":
                 return(received)
             elif received.split(" ")[0] == "EVT":
                 current_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
-                self.eventWindow.ui3.eventList.addItem("{} : {}".format(received, current_time))
-            elif received.split(" ")[0] == "VAL":
+                evt_string = received.replace("EVT ","")
+                self.eventWindow.ui3.eventList.addItem("{} : {}".format(evt_string, current_time))
+            elif received.split(" ")[0] == "ALM":
                 current_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
-                self.eventWindow.ui3.alarmList.addItem(received, current_time)
+                alm_string = received.replace("ALM ","")
+                self.eventWindow.ui3.alarmList.addItem("{} : {}".format(alm_string, current_time))
             else:
                 print("Unhandled data returned from coms hub.")
 
@@ -454,7 +458,7 @@ class DataCollectionThread(QThread):
 
                 values_read = {}
 
-                print(self.value_dict)
+                # print(self.value_dict)
 
 
                 if debug == 0:
@@ -521,7 +525,7 @@ class DataCollectionThread(QThread):
                 # last, and not just y milliseconds work + x milliseconds delay
                 time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
 
-                print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+                # print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
 
                 if time_to_sleep > 0:
                     time.sleep(time_to_sleep)
