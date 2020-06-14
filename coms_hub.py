@@ -6,6 +6,8 @@ from PyQt5 import QtGui, QtCore, QtWidgets
 from PyQt5.QtCore import QThread, pyqtSignal
 from gui import mainUI_v6
 from gui import debug as debug_window
+from gui import eventUI as event_window
+
 import random
 from functools import partial
 import csv
@@ -20,15 +22,35 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
-debug = 1
+debug = 0
 
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
 class DebugWindow(QtWidgets.QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, dct_thread_pointer, parent=None):
         super(DebugWindow, self).__init__(parent)
         self.ui2 = debug_window.Ui_Dialog()
         self.ui2.setupUi(self)
+        self.unregister_pointer = dct_thread_pointer
+
+    # https://stackoverflow.com/a/12366684
+    def closeEvent(self, evnt):
+        self.unregister_pointer.unregister_debugger()
+        super(DebugWindow, self).closeEvent(evnt)
+
+# Need to open DebugWindow as a dialog so I can show it and interact.
+# https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
+class EventWindow(QtWidgets.QDialog):
+    def __init__(self, dct_thread_pointer, parent=None):
+        super(EventWindow, self).__init__(parent)
+        self.ui3 = event_window.Ui_EventWindow()
+        self.ui3.setupUi(self)
+        self.unregister_pointer = dct_thread_pointer
+
+    # https://stackoverflow.com/a/12366684
+    def closeEvent(self, evnt):
+        self.unregister_pointer.unregister_events()
+        super(EventWindow, self).closeEvent(evnt)
 
 class MainWindow(QtWidgets.QDialog):
 
@@ -44,7 +66,6 @@ class MainWindow(QtWidgets.QDialog):
         self.dialogs = {}
         self.time_delay = self.ui.time_spinBox.value()
         self.thread = 0
-        self.debugger_window = 0
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -52,13 +73,10 @@ class MainWindow(QtWidgets.QDialog):
         self.ui.version_pushButton_4.clicked.connect(self.open_version_window)
         self.ui.export_pushButton_5.clicked.connect(self.open_file_save_dialog)
         self.ui.debug_pushButton_6.clicked.connect(self.open_debug_window)
+        self.ui.events_pushButton_3.clicked.connect(self.open_event_window)
 
         # This searches active com ports, and adds them to the comboBox
         self.set_port_comboBox_selections()
-
-    def show_trial_screen(self):
-        self.thread.register()
-        self.dialog.show()
 
     # Simple function. Bind window to a variable, else garbage collection gets it
     def open_version_window(self):
@@ -66,10 +84,10 @@ class MainWindow(QtWidgets.QDialog):
         self.new_window.show()
 
     def open_debug_window(self):
-        self.debugger_window = DebugWindow(self)
-        self.debugger_window.show()
+        self.thread.register_debugger(self)
 
-        self.thread.register_debugger(self.debugger_window)
+    def open_event_window(self):
+        self.thread.register_events(self)
 
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
@@ -116,7 +134,6 @@ class MainWindow(QtWidgets.QDialog):
         for index in range(totalColumns)[::-1]:
             self.ui.tableWidget.removeColumn(index)
 
-
     # https://stackoverflow.com/questions/40815730/how-to-add-and-retrieve-items-to-and-from-qtablewidget
     def add_columns(self, numOfVars):
         self.empty_table_widget()
@@ -129,7 +146,6 @@ class MainWindow(QtWidgets.QDialog):
         self.buttons = []
 
         i = 0
-        print(self.dict_value_type)
 
         for name in self.dict_value_type:
         # for i in range(int(self.numOfVars)):
@@ -138,7 +154,6 @@ class MainWindow(QtWidgets.QDialog):
             # Create Button to push to tableWidget
             self.buttons.append(QtWidgets.QPushButton(self.ui.tableWidget))
             self.buttons[i].setText("Graph".format(i))
-            # self.buttons[i].setToolTip(str(name))
             self.buttons[i].setToolTip(name)
 
             # Create textedit, and link to variable
@@ -154,7 +169,6 @@ class MainWindow(QtWidgets.QDialog):
             self.buttons[i].clicked.connect(partial(self.on_pushButton_clicked, self.buttons[i]))
 
             i = i + 1
-
 
     # https://stackoverflow.com/a/57698918
     # Custom event filter to know when to send data to coms.
@@ -184,15 +198,9 @@ class MainWindow(QtWidgets.QDialog):
         except:
             print("Failed tooltip")
 
-        # Check if window is there, otherwise do not open window
-        if variable_name not in self.dialogs:
-            self.newWindow = GraphWindow(self.thread, variable_name)
-
-            self.dialogs[variable_name] = self.newWindow
-            self.thread.register(self.dialogs[variable_name], variable_name)
-
-        self.dialogs[variable_name].show()
-
+        # Simply call DCT.register with window reference, and variable name.
+        # Let DCT create window and keep track, so we only have one list.
+        self.thread.register(self.thread, variable_name)
 
     def get_value_name_dict(self, serial):
         ser = self.connection
@@ -232,7 +240,7 @@ class MainWindow(QtWidgets.QDialog):
         else:
             self.numOfVars = 6
             dict_value_type = generate_random_data()
-            print(dict_value_type)
+            # print(dict_value_type)
 
         return dict_value_type
 
@@ -290,7 +298,7 @@ class MainWindow(QtWidgets.QDialog):
 
             #Check if any ports are available.
             if len(list_of_ports) == 0:
-                self.ui.com_port_comboBox.addItem("No Ports Found")
+                self.ui.com_port_comboBox.addItem("No Com Ports Found")
                 self.ui.set_pushButton_2.setEnabled(False);
             else:
                 self.ui.set_pushButton_2.setEnabled(True);
@@ -305,7 +313,6 @@ class MainWindow(QtWidgets.QDialog):
     # This function updates the values in the main window.
     def update_data_view(self, data):
         i = 0
-        data.pop('Timestamp') # Timestamp data point added to data, so need to pop it.
 
         for (name, value) in data.items():
             self.ui.tableWidget.setItem(i, 0,QtWidgets.QTableWidgetItem(name[:-1]))
@@ -315,9 +322,6 @@ class MainWindow(QtWidgets.QDialog):
                 self.textedits[name].setText(str(data[name]))
     
             i = i + 1
-
-        print("Updating Data in Widget:")
-        print(data)
 
 # This thread works independently on the main.
 # This one gets each value from the coms hub
@@ -340,6 +344,7 @@ class DataCollectionThread(QThread):
         self.graph_window_pointers = {}
         self.stack = []
         self.debugger = 0
+        self.eventWindow = 0
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -353,32 +358,81 @@ class DataCollectionThread(QThread):
 
     # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
-    def register(self, window, variable):
-        print("I HAVE BEEN REGISTERED")
-        if variable not in self.graph_window_pointers:
-            self.graph_window_pointers[variable] = window
+    def register(self, dct_reference, variable_name):
+        if variable_name not in self.graph_window_pointers:
+            print("REGISTERED NEW WINDOW")
+
+            # Create new graph window, and keep pointer.
+            newWindow = GraphWindow(dct_reference, variable_name)
+            self.graph_window_pointers[variable_name] = newWindow
+
+            # Show window.
+            self.graph_window_pointers[variable_name].show()
 
     # Remove a window from list of windows to be updated.
     # Once reference to window is gone, garbage collection can get it.
     def unregister(self, variable):
-        self.graph_window_pointers.pop(variable)
+        print("Unregistering graph: {}".format(variable))
+        print(self.graph_window_pointers)
+        if variable in self.graph_window_pointers:
+            self.graph_window_pointers.pop(variable)
 
     # Register debug window so it can be updated when open.
-    def register_debugger(self, variable):
+    def register_debugger(self, main_window_reference):
         print("Registered debugger window.")
-        print(variable)
-        self.debugger = variable
+
+        if not self.debugger:
+            self.debugger = DebugWindow(self, main_window_reference)
+            self.debugger.show()
 
     # Unregister debug window so can stop updating it.
     def unregister_debugger(self):
         print("Unregistered debugger window.")
         self.debugger = 0
 
+    # Keeping reference to window so I can update it
+    def register_events(self, main_window_reference):
+        print("Registered event window.")
+    
+        # Register window only if another doesn't exist.
+        if not self.eventWindow:
+            self.eventWindow = EventWindow(self,main_window_reference)
+            self.eventWindow.show()
+
+    def unregister_events(self):
+        # Remove reference (garbage collection will get it)
+        print("Unregistered event window.")
+        self.eventWindow = 0
+
     # Need to be able to send values to the coms_hub. 
     # Creating stack as functions can send data, and only coms hub has access to write to connection
     def add_to_stack(self, command, variable, value):
         self.stack.append((command, variable, value))
         print(self.stack)
+
+
+    # Idea here is that we can recieve an error or alarm from the coms hub at any time. 
+    # Either Ex// b'VAL *VCOUNT 11\n' or Ex// b'EVT HORN\n' or Ex// b'ALM HORN\n'
+    def check_serial_buffer(self):
+        # pass
+        # received = self.connection.readline().decode(encoding='ascii')
+        while self.connection.inWaiting():
+            received = self.connection.readline().decode(encoding='ascii').replace("\n",'')
+
+            print(received)
+
+            if received.split(" ")[0] == "VAL":
+                return(received)
+            elif received.split(" ")[0] == "EVT":
+                current_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
+                evt_string = received.replace("EVT ","")
+                self.eventWindow.ui3.eventList.addItem("{} : {}".format(evt_string, current_time))
+            elif received.split(" ")[0] == "ALM":
+                current_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
+                alm_string = received.replace("ALM ","")
+                self.eventWindow.ui3.alarmList.addItem("{} : {}".format(alm_string, current_time))
+            else:
+                print("Unhandled data returned from coms hub.")
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -394,88 +448,87 @@ class DataCollectionThread(QThread):
         with open('temp/{}'.format(self.file_name), 'w', newline='') as self.csvfile:
             fieldnames = ["Timestamp"] + list(self.value_dict.keys())
             self.writer = csv.DictWriter(self.csvfile, delimiter = "\t", fieldnames=fieldnames)
-
             self.writer.writeheader()
 
-            if debug == 0:
+            #From the dictionary, get value name, and expected value type.
+            while True:
+                # Getting time in milliseconds
+                time_start = time.time() * 1000
+                timestamp = time_start - self.time_stamp_thread_start
 
-                #From the dictionary, get value name, and expected value type.
-                while True:
-                    # Getting time in milliseconds
-                    time_start = time.time() * 1000
-                    timestamp = time_start - self.time_stamp_thread_start
+                values_read = {}
 
-                    for name, type in self.value_dict.items():
+                # print(self.value_dict)
 
-                        #Command to get variable
-                        bitString = "GET {}".format(name)
-                        self.connection.write(bitString.encode(encoding='ascii'))
 
-                        # Update debug window we know what command was sent.
-                        self.update_debugger(bitString.replace("\n",''))
+                if debug == 0:
 
-                        try:
+                    try:
+
+                        # TODO: Need to check 
+                        for name, type in self.value_dict.items():
+
+                            #Command to get variable
+                            bitString = "GET {}".format(name)
+                            self.connection.write(bitString.encode(encoding='ascii'))
+
+                            # Update debug window we know what command was sent.
+                            self.update_debugger(bitString.replace("\n",''))
+
+
+                            # TODO: Check to see if have an error. (Loop while available, and check to see if event?)
+
                             # Read value from Coms hub
-                            received = self.connection.readline().decode(encoding='ascii')
+
+                            received = self.check_serial_buffer()
                             value = received.split(" ")[-1]
                             
                             # Update debug window so we know what info was received.
-                            self.update_debugger(received.replace("\n",''))
+                            self.update_debugger(received)
 
                             if type == 'F':
                                 values_read[name] = float(value)
                             else:
                                 values_read[name] = value
-                        except: #Sometimes get here when reset 
-                            print("Error, at reading data")
-                            pass
 
-                    self.update_registered_windows(values_read, timestamp)
-                    self.new_data_dict.emit(values_read)
+                            self.empty_stack()
 
-                    self.write_to_file(values_read)
+                    except: #Sometimes get here when reset 
+                        print("Error, at reading data")
+                        pass
 
-                    #TODO: Send out data from the stack
-                    self.empty_stack()
-
-                    # Getting time in milliseconds
-                    time_end = time.time() * 1000
-
-                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                    # last, and not just y milliseconds work + x milliseconds delay
-                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
-
-                    time.sleep(time_to_sleep)
-
-            else:
-                while True:
-                    # Getting time in milliseconds
-                    time_start = time.time() * 1000
-                    timestamp = time_start - self.time_stamp_thread_start
-
+                    # Code to run if debugging without coms_hub
+                else:
                     values_read = generate_random_data()
-                    self.new_data_dict.emit(values_read)
-                    self.update_registered_windows(values_read, timestamp)
 
-                    self.write_to_file(values_read)
+                    # Randomly populate events window with alarm and event entries.
+                    if (math.floor(time.time() * 1000)) % 7 == 0:
+                        if self.eventWindow:
+                            self.eventWindow.ui3.eventList.addItem("Had an event")
+                            self.eventWindow.ui3.alarmList.addItem("Had an alarm")
 
                     # Update debugger window
                     self.update_debugger("Got fake data.")
 
-                    #Send out data from the stack
-                    self.empty_stack()
+                self.update_registered_windows(values_read, timestamp)
+                self.new_data_dict.emit(values_read)
 
-                    # Getting time in milliseconds
-                    time_end = time.time() * 1000
+                self.write_to_file(values_read)
 
-                    # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
-                    # last, and not just y milliseconds work + x milliseconds delay
-                    time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+                #Send out data from the stack
+                self.empty_stack()
 
-                    print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+                # Getting time in milliseconds
+                time_end = time.time() * 1000
 
-                    if time_to_sleep > 0:
-                        time.sleep(time_to_sleep)
+                # Subtract worked timed from time_delay so actually get next data at x milliseconds from 
+                # last, and not just y milliseconds work + x milliseconds delay
+                time_to_sleep = (self.time_delay - (time_end - time_start)) / 1000
+
+                # print("With delay of {} will sleep {}".format(self.time_delay, time_to_sleep * 1000))
+
+                if time_to_sleep > 0:
+                    time.sleep(time_to_sleep)
 
     # Check if debugWindow has been opened, then update. If not in focus, scroll to bottom of page.
     def update_debugger(self, string):
@@ -490,13 +543,19 @@ class DataCollectionThread(QThread):
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read, timestamp):
         if len(self.graph_window_pointers) != 0:
-            print("Updating {} graph windows".format(self.graph_window_pointers))
+            # print("Updating {} graph windows".format(self.graph_window_pointers))
 
-            for registered_window in self.graph_window_pointers:
-                print("Calling window: {}".format(registered_window))
-                print(values_read[registered_window])
-                self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
-
+            try:
+                for registered_window in self.graph_window_pointers:
+                    # print("Calling window: {}".format(registered_window))
+                    # print(values_read[registered_window])
+                    print(self.graph_window_pointers)
+                    self.graph_window_pointers[registered_window].receive_data(int(values_read[registered_window]), timestamp)
+            except RuntimeError as e:
+                print("Encountered error: {} ".format(e))
+                print("Usually dictionary changing size (unregister) while this function is looping")
+            except:
+                print("Don't know what error occured.")
 
     def empty_stack(self):
         if len(self.stack) > 0:
@@ -504,6 +563,8 @@ class DataCollectionThread(QThread):
             for (command, variable_name, value) in self.stack:
                 to_send = "{} {} {}\n".format(command, variable_name.replace('\n',''), value)
                 print("Command sent to coms_hub: {}".format(to_send))
+
+                # Only write if we have a connection open
                 if debug == 0:
                     self.connection.write(to_send.encode(encoding='ascii'))
                 self.stack.pop(0)
@@ -513,9 +574,10 @@ class DataCollectionThread(QThread):
         #Get time stamp in miliseconds since thread start
         timestamp = (time.time() * 1000) - self.time_stamp_thread_start
 
-        values["Timestamp"] = math.floor(timestamp)
+        dict_to_write = values.copy()
+        dict_to_write["Timestamp"] = math.floor(timestamp)
 
-        self.writer.writerow(values)
+        self.writer.writerow(dict_to_write)
         self.csvfile.flush()
 
     # https://stackoverflow.com/questions/15416334/qfiledialog-how-to-set-default-filename-in-save-as-dialog
@@ -587,7 +649,7 @@ class GraphWindow(QtWidgets.QDialog):
     # Simple update is okay as it doesn't impact performance.
     # Very quick, so wont block GUI from responding.
     def receive_data(self, data, timestamp):
-        print("Got data: {}".format(data))
+        # print("Got data: {}".format(data))
         self.value.pop(0)
         self.value.append(int(data))
 
