@@ -22,7 +22,7 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
-debug = 1
+debug = 0
 
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -340,6 +340,7 @@ class DataCollectionThread(QThread):
         self.stack = []
         self.debugger = 0
         self.eventWindow = EventWindow()
+        self.com_disconnect = 0
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -406,7 +407,7 @@ class DataCollectionThread(QThread):
         while self.connection.inWaiting():
             received = self.connection.readline().decode(encoding='ascii').replace("\n",'')
 
-            print(received)
+            # print(received)
 
             if received.split(" ")[0] == "VAL":
                 return(received)
@@ -420,6 +421,8 @@ class DataCollectionThread(QThread):
                 self.eventWindow.ui3.alarmList.addItem("{} : {}".format(alm_string, current_time))
             else:
                 print("Unhandled data returned from coms hub.")
+
+        return 0
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -437,8 +440,13 @@ class DataCollectionThread(QThread):
             self.writer = csv.DictWriter(self.csvfile, delimiter = "\t", fieldnames=fieldnames)
             self.writer.writeheader()
 
+            # Wipe com port buffer
+            self.connection.flushInput()
+            self.connection.flushOutput()
+
+
             #From the dictionary, get value name, and expected value type.
-            while True:
+            while self.com_disconnect == 0:
                 # Getting time in milliseconds
                 time_start = time.time() * 1000
                 timestamp = time_start - self.time_stamp_thread_start
@@ -446,6 +454,7 @@ class DataCollectionThread(QThread):
                 values_read = {}
 
                 # print(self.value_dict)
+
 
 
                 if debug == 0:
@@ -458,30 +467,38 @@ class DataCollectionThread(QThread):
                             #Command to get variable
                             bitString = "GET {}".format(name)
                             self.connection.write(bitString.encode(encoding='ascii'))
+                            time.sleep(0.001)
 
                             # Update debug window we know what command was sent.
                             self.update_debugger(bitString.replace("\n",''))
 
-
-                            # TODO: Check to see if have an error. (Loop while available, and check to see if event?)
-
                             # Read value from Coms hub
-
                             received = self.check_serial_buffer()
-                            value = received.split(" ")[-1]
                             
-                            # Update debug window so we know what info was received.
-                            self.update_debugger(received)
+                            if received:
+                                value = received.split(" ")[-1]
+                                
+                                # Update debug window so we know what info was received.
+                                self.update_debugger(received)
 
-                            if type == 'F':
-                                values_read[name] = float(value)
-                            else:
-                                values_read[name] = value
+                                if type == 'F':
+                                    values_read[name] = float(value)
+                                else:
+                                    values_read[name] = value
 
                             self.empty_stack()
 
                     except: #Sometimes get here when reset 
                         print("Error, at reading data")
+
+                        # Check if com port is still connected, otherwise stop loop.
+                        try:
+                            print(self.connection.inWaiting())
+                        except:
+                            print("Made wose")
+                            self.com_disconnect = 1
+                            # Show error dialog
+                            # Show window
                         pass
 
                     # Code to run if debugging without coms_hub
