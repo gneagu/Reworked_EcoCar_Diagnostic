@@ -22,7 +22,7 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
-debug = 1
+debug = 0
 
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -340,6 +340,7 @@ class DataCollectionThread(QThread):
         self.stack = []
         self.debugger = 0
         self.eventWindow = EventWindow()
+        self.com_disconnect = 0
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -401,11 +402,15 @@ class DataCollectionThread(QThread):
     # Idea here is that we can recieve an error or alarm from the coms hub at any time. 
     # Either Ex// b'VAL *VCOUNT 11\n' or Ex// b'EVT HORN\n' or Ex// b'ALM HORN\n'
     def check_serial_buffer(self):
-        # pass
-        # received = self.connection.readline().decode(encoding='ascii')
+ 
+        # Have to have this conditional, otherwise the thread returns before actually reading any data, and then data is off by few spots.
+        # So wait until get data. 
+        while not self.connection.inWaiting():
+            print("Waiting for data")
         while self.connection.inWaiting():
             received = self.connection.readline().decode(encoding='ascii').replace("\n",'')
 
+            print("received")
             print(received)
 
             if received.split(" ")[0] == "VAL":
@@ -420,6 +425,8 @@ class DataCollectionThread(QThread):
                 self.eventWindow.ui3.alarmList.addItem("{} : {}".format(alm_string, current_time))
             else:
                 print("Unhandled data returned from coms hub.")
+
+            return 0
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -437,8 +444,13 @@ class DataCollectionThread(QThread):
             self.writer = csv.DictWriter(self.csvfile, delimiter = "\t", fieldnames=fieldnames)
             self.writer.writeheader()
 
+            # Wipe com port buffer
+            self.connection.flushInput()
+            self.connection.flushOutput()
+
+
             #From the dictionary, get value name, and expected value type.
-            while True:
+            while self.com_disconnect == 0:
                 # Getting time in milliseconds
                 time_start = time.time() * 1000
                 timestamp = time_start - self.time_stamp_thread_start
@@ -446,6 +458,8 @@ class DataCollectionThread(QThread):
                 values_read = {}
 
                 # print(self.value_dict)
+                print("Loop")
+
 
 
                 if debug == 0:
@@ -458,30 +472,47 @@ class DataCollectionThread(QThread):
                             #Command to get variable
                             bitString = "GET {}".format(name)
                             self.connection.write(bitString.encode(encoding='ascii'))
+                            time.sleep(0.003)
 
                             # Update debug window we know what command was sent.
                             self.update_debugger(bitString.replace("\n",''))
 
 
-                            # TODO: Check to see if have an error. (Loop while available, and check to see if event?)
+                            print("Before debug")
+                            print("WROTE: {}".format(str(bitString)))
 
                             # Read value from Coms hub
-
                             received = self.check_serial_buffer()
-                            value = received.split(" ")[-1]
-                            
-                            # Update debug window so we know what info was received.
-                            self.update_debugger(received)
 
-                            if type == 'F':
-                                values_read[name] = float(value)
-                            else:
-                                values_read[name] = value
+
+                            print("After update")
+
+                            print("Got")
+                            if received:
+                                print(received)
+                                value = received.split(" ")[-1]
+                                
+                                # Update debug window so we know what info was received.
+                                self.update_debugger(received)
+
+                                if type == 'F':
+                                    values_read[name] = float(value)
+                                else:
+                                    values_read[name] = value
 
                             self.empty_stack()
 
                     except: #Sometimes get here when reset 
                         print("Error, at reading data")
+
+                        # Check if com port is still connected, otherwise stop loop.
+                        try:
+                            print(self.connection.inWaiting())
+                        except:
+                            print("Made wose")
+                            self.com_disconnect = 1
+                            # Show error dialog
+                            # Show window
                         pass
 
                     # Code to run if debugging without coms_hub
@@ -497,7 +528,11 @@ class DataCollectionThread(QThread):
                     # Update debugger window
                     self.update_debugger("Got fake data.")
 
+
+
                 self.update_registered_windows(values_read, timestamp)
+                print("Emit")
+                print(values_read)
                 self.new_data_dict.emit(values_read)
 
                 self.write_to_file(values_read)
