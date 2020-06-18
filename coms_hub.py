@@ -402,12 +402,16 @@ class DataCollectionThread(QThread):
     # Idea here is that we can recieve an error or alarm from the coms hub at any time. 
     # Either Ex// b'VAL *VCOUNT 11\n' or Ex// b'EVT HORN\n' or Ex// b'ALM HORN\n'
     def check_serial_buffer(self):
-        # pass
-        # received = self.connection.readline().decode(encoding='ascii')
+ 
+        # Have to have this conditional, otherwise the thread returns before actually reading any data, and then data is off by few spots.
+        # So wait until get data. 
+        while not self.connection.inWaiting():
+            print("Waiting for data")
         while self.connection.inWaiting():
             received = self.connection.readline().decode(encoding='ascii').replace("\n",'')
 
-            # print(received)
+            print("received")
+            print(received)
 
             if received.split(" ")[0] == "VAL":
                 return(received)
@@ -422,7 +426,7 @@ class DataCollectionThread(QThread):
             else:
                 print("Unhandled data returned from coms hub.")
 
-        return 0
+            return 0
 
     # This is the main function of the thread. Purpose is to query coms hub
     # for variable from dictionary of value names and types.
@@ -454,6 +458,7 @@ class DataCollectionThread(QThread):
                 values_read = {}
 
                 # print(self.value_dict)
+                print("Loop")
 
 
 
@@ -467,15 +472,24 @@ class DataCollectionThread(QThread):
                             #Command to get variable
                             bitString = "GET {}".format(name)
                             self.connection.write(bitString.encode(encoding='ascii'))
-                            time.sleep(0.001)
+                            time.sleep(0.003)
 
                             # Update debug window we know what command was sent.
                             self.update_debugger(bitString.replace("\n",''))
 
+
+                            print("Before debug")
+                            print("WROTE: {}".format(str(bitString)))
+
                             # Read value from Coms hub
                             received = self.check_serial_buffer()
-                            
+
+
+                            print("After update")
+
+                            print("Got")
                             if received:
+                                print(received)
                                 value = received.split(" ")[-1]
                                 
                                 # Update debug window so we know what info was received.
@@ -514,7 +528,11 @@ class DataCollectionThread(QThread):
                     # Update debugger window
                     self.update_debugger("Got fake data.")
 
+
+
                 self.update_registered_windows(values_read, timestamp)
+                print("Emit")
+                print(values_read)
                 self.new_data_dict.emit(values_read)
 
                 self.write_to_file(values_read)
