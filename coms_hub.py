@@ -24,6 +24,16 @@ from numpy import linspace
 
 debug = 0
 
+
+class ErrorWindow(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(ErrorWindow, self).__init__(parent)
+
+        self.layout = QtWidgets.QVBoxLayout()
+        self.layout.addWidget(QtWidgets.QLabel("Coms Hub has \nbeen Disconnected"))
+
+        self.setLayout(self.layout)
+
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
 class DebugWindow(QtWidgets.QDialog):
@@ -341,6 +351,7 @@ class DataCollectionThread(QThread):
         self.debugger = 0
         self.eventWindow = EventWindow()
         self.com_disconnect = 0
+        self.error_window = ErrorWindow()
 
     def setup(self, dict_value_names, serial_con, time_delay):
         self.connection = serial_con
@@ -351,6 +362,12 @@ class DataCollectionThread(QThread):
     def change_delay(self, new_time_delay):
         print("Delay has been changed to: {}".format(new_time_delay))
         self.time_delay = new_time_delay
+
+    def show_error(self):
+        print("OH BOY")
+
+        self.error_window.show()
+
 
     # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
@@ -437,6 +454,8 @@ class DataCollectionThread(QThread):
 
         self.file_name = str(datetime.datetime.now()).split(".")[0].replace(":",'-') + '.tsv'
 
+
+
         # https://docs.python.org/3/library/csv.html#csv.DictWriter
         # By using DictWriter, can supply writer with a dictionary, and it will take care of placing data.
         with open('temp/{}'.format(self.file_name), 'w', newline='') as self.csvfile:
@@ -511,7 +530,12 @@ class DataCollectionThread(QThread):
                         except:
                             print("Made wose")
                             self.com_disconnect = 1
+
+                            print("BEFORE")
+                            self.show_error()
                             # Show error dialog
+                            print("AFTER")
+                            time.sleep(1)
                             # Show window
                         pass
 
