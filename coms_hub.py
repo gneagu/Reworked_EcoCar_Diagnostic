@@ -97,6 +97,13 @@ class MainWindow(QtWidgets.QDialog):
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
         # Close thread if it was opened (avoid error)
+        self.thread.close_all_windows()
+
+        if self.new_window:
+            self.new_window.close()
+        if self.error_window:
+            self.error_window.close()
+
         if self.thread:
             self.thread.killthread()
         event.accept() # let the window close
@@ -377,6 +384,16 @@ class DataCollectionThread(QThread):
     def change_delay(self, new_time_delay):
         print("Delay has been changed to: {}".format(new_time_delay))
         self.time_delay = new_time_delay
+
+    def close_all_windows(self):
+        if self.eventWindow:
+            self.eventWindow.close()
+
+        if self.debugger:
+            self.debugger.close()
+            
+        for i in self.graph_window_pointers.copy():
+            self.graph_window_pointers.pop(i)
 
     # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
