@@ -55,7 +55,6 @@ class EventWindow(QtWidgets.QDialog):
         super(EventWindow, self).__init__(parent)
         self.ui3 = event_window.Ui_EventWindow()
         self.ui3.setupUi(self)
-        # self.unregister_pointer = dct_thread_pointer
 
 class MainWindow(QtWidgets.QDialog):
 
@@ -72,7 +71,6 @@ class MainWindow(QtWidgets.QDialog):
         self.time_delay = self.ui.time_spinBox.value()
         self.thread = 0
         self.error_window = ErrorWindow()
-
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -352,13 +350,11 @@ class DataCollectionThread(QThread):
 
     #This dict is sent as a signal from the thread that started it.
     new_data_dict = pyqtSignal(dict)
+    #This signal is sent when the DCT ends due to the coms hub being disconnected.
     error_signal = pyqtSignal(str)
-
 
     def __init__(self):
         QThread.__init__(self, parent = None)
-        # print(parent)
-        # print(app)
         self.threadactive = False
         self.connection = 0
         self.value_dict = {}
@@ -367,13 +363,7 @@ class DataCollectionThread(QThread):
         self.debugger = 0
         self.eventWindow = EventWindow()
         self.com_disconnect = 0
-        # if finish:
-        #     self.finish = finish
-        #     self.finished.connect(self.onfinish)
 
-
-    # def onfinish(self):
-    #     self.finish()
 
     def setup(self, dict_value_names, serial_con, time_delay, masterwindow_pointer):
         self.connection = serial_con
@@ -387,13 +377,6 @@ class DataCollectionThread(QThread):
     def change_delay(self, new_time_delay):
         print("Delay has been changed to: {}".format(new_time_delay))
         self.time_delay = new_time_delay
-
-    # def show_error(self):
-    #     print("OH BOY")
-    #     self.error_window = ErrorWindow()
-
-    #     self.error_window.show()
-
 
     # Even though worker is running infinitely, can call this function and "register" windows with variable it requires.
     # Essentially I just pass a pointer to the window, and the name of the variable it needs. 
@@ -429,10 +412,6 @@ class DataCollectionThread(QThread):
         print("Unregistered debugger window.")
         self.debugger = 0
 
-    @QtCore.pyqtSlot()
-    def on_finished(self):
-        print('thread finished')
-
     # Keeping reference to window so I can update it
     def show_events_window(self, main_window_reference):
         print("Registered event window.")
@@ -457,9 +436,6 @@ class DataCollectionThread(QThread):
         while self.connection.inWaiting():
             received = self.connection.readline().decode(encoding='ascii').replace("\n",'')
 
-            print("received")
-            print(received)
-
             if received.split(" ")[0] == "VAL":
                 return(received)
             elif received.split(" ")[0] == "EVT":
@@ -481,10 +457,7 @@ class DataCollectionThread(QThread):
         values_read = {}
 
         self.time_stamp_thread_start = time.time() * 1000
-
         self.file_name = str(datetime.datetime.now()).split(".")[0].replace(":",'-') + '.tsv'
-
-
 
         # https://docs.python.org/3/library/csv.html#csv.DictWriter
         # By using DictWriter, can supply writer with a dictionary, and it will take care of placing data.
@@ -506,12 +479,6 @@ class DataCollectionThread(QThread):
                 timestamp = time_start - self.time_stamp_thread_start
 
                 values_read = {}
-
-                # print(self.value_dict)
-                print("Loop")
-
-
-                # self.master_pointer.show_error()
 
                 if debug == 0:
 
@@ -560,18 +527,12 @@ class DataCollectionThread(QThread):
                         try:
                             print(self.connection.inWaiting())
                         except:
-                            print("Made wose")
+                            print("Coms hub has been disconnected.")
+                            # Emit signal to main thread to open error window.
+                            
                             self.com_disconnect = 1
                             self.error_signal.emit('error')
 
-                            print("BEFORE")
-                            # self.master_pointer.show_error()
-                            # Show error dialog
-                            print("AFTER")
-                            time.sleep(1)
-                            # Show window
-                            # self.quit()
-                            # self
                         pass
 
                     # Code to run if debugging without coms_hub
@@ -586,8 +547,6 @@ class DataCollectionThread(QThread):
 
                     # Update debugger window
                     self.update_debugger("Got fake data.")
-
-
 
                 self.update_registered_windows(values_read, timestamp)
                 print("Emit")
@@ -624,7 +583,7 @@ class DataCollectionThread(QThread):
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read, timestamp):
         if len(self.graph_window_pointers) != 0:
-            # print("Updating {} graph windows".format(self.graph_window_pointers))
+            print("Updating {} graph windows".format(self.graph_window_pointers))
 
             try:
                 for registered_window in self.graph_window_pointers:
