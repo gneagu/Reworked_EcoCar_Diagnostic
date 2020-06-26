@@ -160,7 +160,6 @@ class MainWindow(QtWidgets.QDialog):
         i = 0
 
         for name in self.dict_value_type:
-        # for i in range(int(self.numOfVars)):
             self.ui.tableWidget.insertRow(i)
 
             # Create Button to push to tableWidget
@@ -191,9 +190,22 @@ class MainWindow(QtWidgets.QDialog):
             if event.key() == QtCore.Qt.Key_Return and obj.hasFocus():
                 print('Enter pressed')
 
+                # Check here to see if right data type. (Float) / (unsigned).
+
                 # TODO: Beautify with a lambda statment
-                value = [key for key,value in self.textedits.items() if value == obj]
-                self.thread.add_to_stack('SET', value[0], obj.text())
+                variable_name = [key for key,value in self.textedits.items() if value == obj]
+
+                # self.dict_value_type
+                variable_type = self.dict_value_type[variable_name]
+
+                if type == 'F':
+                    self.thread.add_to_stack('SET', variable_name[0], float(obj.text()))
+                elif type == 'U':
+                    if int(obj.text()) >= 0:
+                        self.thread.add_to_stack('SET', variable_name[0], int(float(obj.text())))
+                else:
+                    self.thread.add_to_stack('SET', variable_name[0], int(float(obj.text())))
+                
                 return True
 
         return False
@@ -272,7 +284,6 @@ class MainWindow(QtWidgets.QDialog):
 
     # Recieves a dict with new data from coms board, and sends to worker thread.
     # Then starts worker thread.
-    @QtCore.pyqtSlot()
     def set_data_view_variables(self):
         self.disable_com_selections()
         self.enable_com_buttons()
@@ -282,6 +293,7 @@ class MainWindow(QtWidgets.QDialog):
         # Adding condition because unless a connection is made, or debug. don't want to go any further.
         if self.connection or debug == 1:
             self.dict_value_type = self.get_value_name_dict(self.connection)
+            print(self.dict_value_type)
 
             #Set the columns here.0
             self.add_columns(self.numOfVars)
@@ -300,6 +312,9 @@ class MainWindow(QtWidgets.QDialog):
 
     # Find and add active COM ports to the gui combobox.
     def set_port_comboBox_selections(self):
+        # Clear any items in the combobox already
+        self.ui.com_port_comboBox.clear() 
+        
         list_of_ports = []
 
         if debug == 0:
@@ -318,18 +333,16 @@ class MainWindow(QtWidgets.QDialog):
                 self.ui.set_pushButton_2.setEnabled(True);
                 for port in list_of_ports:
                     self.ui.com_port_comboBox.addItem(port)
+
+            # Todo: Add WIFI selection here. (WIll have to change the main window UI)
         else:
             self.ui.set_pushButton_2.setEnabled(True);
             self.ui.com_port_comboBox.addItem("DEBUG")
 
-
-
     def show_error(self, signal):
-        print("OH BOY")
+        print("Encountered an error")
 
         self.error_window.show()
-
-
 
     # Emmited data from DataCollectionThread comes here.
     # This function updates the values in the main window.
@@ -391,7 +404,7 @@ class DataCollectionThread(QThread):
 
         if self.debugger:
             self.debugger.close()
-            
+
         for i in self.graph_window_pointers.copy():
             self.graph_window_pointers.pop(i)
 
