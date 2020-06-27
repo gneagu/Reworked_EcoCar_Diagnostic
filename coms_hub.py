@@ -43,15 +43,14 @@ class DebugWindow(QtWidgets.QDialog):
         self.dct_thread_pointer = dct_thread_pointer
         self.ui2.setupUi(self)
         self.unregister_pointer = dct_thread_pointer
-        self.dct_thread_pointer.new_item.connect(self.addItem)
+        self.dct_thread_pointer.scroll_signal.connect(self.scrollSelf)
 
     # https://stackoverflow.com/a/12366684
     def closeEvent(self, evnt):
         self.unregister_pointer.unregister_debugger()
         super(DebugWindow, self).closeEvent(evnt)
 
-    def addItem(self, item):
-        # self.ui2.listView.addItem(item)
+    def scrollSelf(self, item):
         self.ui2.listView.scrollToBottom()
 
 
@@ -382,7 +381,7 @@ class DataCollectionThread(QThread):
     #This signal is sent when the DCT ends due to the coms hub being disconnected.
     error_signal = pyqtSignal(str)
 
-    new_item = pyqtSignal(str)
+    scroll_signal = pyqtSignal(str)
 
     def __init__(self):
         QThread.__init__(self, parent = None)
@@ -614,18 +613,15 @@ class DataCollectionThread(QThread):
     # Check if debugWindow has been opened, then update. If not in focus, scroll to bottom of page.
     def update_debugger(self, string):
         if self.debugger:
-
-            # TODO: Replace with emit so can be thread safe
-
+            # Safe to add items to the listview from DCT
             self.debugger.ui2.listView.addItem(string)
-
 
             if not self.debugger.ui2.listView.hasFocus():
                 print("Not focussed")
 
-                self.new_item.emit(string)
-
-                # self.debugger.ui2.listView.scrollToBottom()
+                # Need to emit signal to DebugWindow listview to scroll itseld. 
+                # Otherwise crashes program.
+                self.scroll_signal.emit(string)
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read, timestamp):
