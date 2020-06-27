@@ -22,7 +22,7 @@ from pyqtgraph import PlotWidget, plot
 import pyqtgraph as pg
 from numpy import linspace
 
-debug = 0
+debug = 1
 
 
 class ErrorWindow(QtWidgets.QDialog):
@@ -40,13 +40,19 @@ class DebugWindow(QtWidgets.QDialog):
     def __init__(self, dct_thread_pointer, parent=None):
         super(DebugWindow, self).__init__(parent)
         self.ui2 = debug_window.Ui_Dialog()
+        self.dct_thread_pointer = dct_thread_pointer
         self.ui2.setupUi(self)
         self.unregister_pointer = dct_thread_pointer
+        self.dct_thread_pointer.scroll_signal.connect(self.scrollSelf)
 
     # https://stackoverflow.com/a/12366684
     def closeEvent(self, evnt):
         self.unregister_pointer.unregister_debugger()
         super(DebugWindow, self).closeEvent(evnt)
+
+    def scrollSelf(self, item):
+        self.ui2.listView.scrollToBottom()
+
 
 # Need to open DebugWindow as a dialog so I can show it and interact.
 # https://stackoverflow.com/questions/29303901/attributeerror-startqt4-object-has-no-attribute-accept
@@ -71,6 +77,7 @@ class MainWindow(QtWidgets.QDialog):
         self.time_delay = self.ui.time_spinBox.value()
         self.thread = 0
         self.error_window = ErrorWindow()
+        self.new_window = 0
 
         # Connecting push buttons to their functions
         self.ui.set_pushButton_2.clicked.connect(self.set_data_view_variables)
@@ -97,7 +104,8 @@ class MainWindow(QtWidgets.QDialog):
     # Over-riding close event so I can end the DataCollectionThread also.
     def closeEvent(self, event):
         # Close thread if it was opened (avoid error)
-        self.thread.close_all_windows()
+        if self.thread:
+            self.thread.close_all_windows()
 
         if self.new_window:
             self.new_window.close()
@@ -373,6 +381,8 @@ class DataCollectionThread(QThread):
     #This signal is sent when the DCT ends due to the coms hub being disconnected.
     error_signal = pyqtSignal(str)
 
+    scroll_signal = pyqtSignal(str)
+
     def __init__(self):
         QThread.__init__(self, parent = None)
         self.threadactive = False
@@ -603,12 +613,15 @@ class DataCollectionThread(QThread):
     # Check if debugWindow has been opened, then update. If not in focus, scroll to bottom of page.
     def update_debugger(self, string):
         if self.debugger:
-
+            # Safe to add items to the listview from DCT
             self.debugger.ui2.listView.addItem(string)
 
             if not self.debugger.ui2.listView.hasFocus():
                 print("Not focussed")
-                self.debugger.ui2.listView.scrollToBottom()
+
+                # Need to emit signal to DebugWindow listview to scroll itseld. 
+                # Otherwise crashes program.
+                self.scroll_signal.emit(string)
 
     # Update registered windows by sending variable data they need.
     def update_registered_windows(self, values_read, timestamp):
